@@ -1,0 +1,93 @@
+import React, { useEffect, useState } from 'react';
+import { Route, Redirect } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+
+const ProtectedRoute = ({ children, ...rest }) => {
+  const { isAuthenticated, loading, checkAuthStatus, forceRefreshAuth, clearAndRefreshAuth } = useAuth();
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    let timeoutId = null;
+
+    const checkAuth = async () => {
+      if (!loading) {
+        // Nếu không loading nhưng chưa authenticated, thử check lại
+        if (!isAuthenticated) {
+          await clearAndRefreshAuth();
+          // Đợi một chút để state update
+          timeoutId = setTimeout(() => {
+            if (isMounted) {
+              setIsChecking(false);
+            }
+          }, 2000);
+        } else {
+          if (isMounted) {
+            setIsChecking(false);
+          }
+        }
+      }
+    };
+
+    checkAuth();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [loading, isAuthenticated, checkAuthStatus, forceRefreshAuth, clearAndRefreshAuth]);
+
+  // Hiển thị loading nếu đang check hoặc loading
+  if (loading || isChecking) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loader}></div>
+        <p>Đang kiểm tra đăng nhập...</p>
+      </div>
+    );
+  }
+
+
+  return (
+    <Route
+      {...rest}
+      render={({ location }) =>
+        isAuthenticated ? (
+          children
+        ) : (
+          <Redirect
+            to={{
+              pathname: '/login',
+              state: { from: location }
+            }}
+          />
+        )
+      }
+    />
+  );
+};
+
+const styles = {
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#f5f5f5'
+  },
+  loader: {
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #3498db',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite',
+    marginBottom: '1rem'
+  }
+};
+
+export default ProtectedRoute;
