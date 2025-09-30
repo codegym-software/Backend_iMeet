@@ -33,9 +33,22 @@ public class AuthService {
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
-    public LoginResponse login(String email, String password) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+    public LoginResponse login(String usernameOrEmail, String password) {
+        User user = null;
+        
+        // Thử tìm user bằng email trước
+        if (usernameOrEmail.contains("@")) {
+            user = userRepository.findByEmail(usernameOrEmail).orElse(null);
+        }
+        
+        // Nếu không tìm thấy bằng email, thử tìm bằng username
+        if (user == null) {
+            user = userRepository.findByUsername(usernameOrEmail).orElse(null);
+        }
+        
+        if (user == null) {
+            throw new RuntimeException("Tên đăng nhập hoặc email không tồn tại");
+        }
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new RuntimeException("Mật khẩu không đúng");
