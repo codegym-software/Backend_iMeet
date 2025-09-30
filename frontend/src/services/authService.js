@@ -12,11 +12,11 @@ const apiClient = axios.create({
 });
 
 class AuthService {
-  // Đăng nhập truyền thống bằng email/password
-  async login(email, password) {
+  // Đăng nhập truyền thống bằng username/email/password
+  async login(usernameOrEmail, password) {
     try {
       const response = await apiClient.post('/api/auth/login', {
-        email,
+        usernameOrEmail,
         password
       });
       
@@ -317,7 +317,6 @@ class AuthService {
           }
         } catch (error) {
           // Nếu có lỗi (server không chạy, network error, etc.), vẫn trả về user từ localStorage
-          console.log('Could not update user data from server, using local data:', error.message);
         }
       }
       
@@ -441,6 +440,44 @@ class AuthService {
         }
       });
       
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  }
+
+  // Forgot Password APIs
+  async sendForgotPasswordCode(email) {
+    try {
+      const response = await apiClient.post('/api/forgot-password/send-code', {
+        email
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  }
+
+  async verifyForgotPasswordCode(email, code) {
+    try {
+      const response = await apiClient.post('/api/forgot-password/verify-code', {
+        email,
+        code
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  }
+
+  async resetPassword(email, code, newPassword, confirmPassword) {
+    try {
+      const response = await apiClient.post('/api/forgot-password/reset-password', {
+        email,
+        code,
+        newPassword,
+        confirmPassword
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

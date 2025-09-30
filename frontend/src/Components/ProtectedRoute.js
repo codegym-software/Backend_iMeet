@@ -3,7 +3,7 @@ import { Route, Redirect } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProtectedRoute = ({ children, ...rest }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, checkLocalAuth } = useAuth();
 
   // Hiển thị loading nếu đang loading hoặc chưa xác định authentication
   if (loading) {
@@ -15,6 +15,13 @@ const ProtectedRoute = ({ children, ...rest }) => {
     );
   }
 
+  // Fallback: Nếu isAuthenticated = false, kiểm tra localStorage
+  if (!isAuthenticated) {
+    const hasLocalAuth = checkLocalAuth();
+    if (hasLocalAuth) {
+      return children; // Có auth data trong localStorage, cho phép truy cập
+    }
+  }
 
   return (
     <Route

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link, useHistory } from 'react-router-dom'; // Thêm useHistory
-import { useAuth } from '../contexts/AuthContext'; // Thêm useAuth
+import { Link, useHistory } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './Signup.css';
+import './common/PasswordToggleStyles.css';
 import ImgAsset from '../public';
 
 export default function Signup() {
@@ -18,15 +19,15 @@ export default function Signup() {
   const [signupStatus, setSignupStatus] = useState({ message: '', type: '' });
   const [isLoading, setIsLoading] = useState(false);
 
-  const { signup } = useAuth(); // Sử dụng useAuth
-  const history = useHistory(); // Sử dụng useHistory
+  const { signup } = useAuth();
+  const history = useHistory();
 
   const validatePassword = (password) => {
     const minLength = password.length >= 8;
     const hasUpperCase = /[A-Z]/.test(password);
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumber = /[0-9]/.test(password);
-    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]/.test(password);
 
     if (!minLength) return 'Mật khẩu phải có ít nhất 8 ký tự';
     if (!hasUpperCase) return 'Mật khẩu phải có ít nhất 1 ký tự viết hoa';
@@ -87,6 +88,14 @@ export default function Signup() {
       {/* Left side */}
       <div className="signup-container">
         <div className="signup-box">
+          <div className="logo-section">
+            <div className="logo">
+              <img src='/logo.jpg' alt='iMeet' className='logo-img' />
+              <span className='logo-text'>iMeet</span>
+            </div>
+            <p className='logo-subtitle'>Hệ thống đặt lịch họp trực tuyến</p>
+          </div>
+          
           <div className="signup-header">
             <h2 className="signup-title">Sign Up</h2>
             <p className="signup-subtext">Create your account</p>

@@ -6,6 +6,7 @@ import Signup from '../Components/Signup';
 import Login from '../Components/Login';
 import Dashboard from '../Components/Dashboard';
 import Profile from '../Components/Profile';
+import ForgotPassword from '../Components/ForgotPassword';
 import { OAuth2Callback } from '../Components';
 
 const RouterDOM = () => {
@@ -18,6 +19,7 @@ const RouterDOM = () => {
 					</Route>
 					<Route exact path="/signup"><Signup /></Route>
 					<Route exact path="/login"><Login /></Route>
+					<Route exact path="/forgot-password"><ForgotPassword /></Route>
 					
 					{/* Protected Routes - cần đăng nhập */}
 					<ProtectedRoute exact path="/dashboard">

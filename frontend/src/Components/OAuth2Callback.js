@@ -8,7 +8,7 @@ const OAuth2Callback = () => {
   const [message, setMessage] = useState('Đang đăng nhập...');
   const history = useHistory();
   const location = useLocation();
-  const { checkAuthStatus } = useAuth();
+  const { checkAuthStatus, checkLocalAuth } = useAuth();
 
   useEffect(() => {
     handleCallback();
@@ -43,6 +43,9 @@ const OAuth2Callback = () => {
             };
             
             localStorage.setItem('oauth2User', JSON.stringify(oauth2User));
+            
+            // Cập nhật AuthContext ngay lập tức
+            checkLocalAuth();
             
             setStatus('success');
             setMessage('Đăng nhập thành công!');
