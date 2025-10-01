@@ -1,22 +1,31 @@
 package com.example.iMeetBE.dto;
 
 public class LoginRequest {
-    private String email;
+    private String usernameOrEmail;
     private String password;
 
     public LoginRequest() {}
 
-    public LoginRequest(String email, String password) {
-        this.email = email;
+    public LoginRequest(String usernameOrEmail, String password) {
+        this.usernameOrEmail = usernameOrEmail;
         this.password = password;
     }
 
+    public String getUsernameOrEmail() {
+        return usernameOrEmail;
+    }
+
+    public void setUsernameOrEmail(String usernameOrEmail) {
+        this.usernameOrEmail = usernameOrEmail;
+    }
+    
+    // Backward compatibility
     public String getEmail() {
-        return email;
+        return usernameOrEmail;
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.usernameOrEmail = email;
     }
 
     public String getPassword() {

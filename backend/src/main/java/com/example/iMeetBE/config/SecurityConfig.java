@@ -49,21 +49,18 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) // Allow sessions for OAuth2
             )
             .authorizeHttpRequests(auth -> auth
-                // Allow public access to authentication endpoints
+                .requestMatchers("/api/forgot-password/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/auth/signup").permitAll()
-                .requestMatchers("/api/auth/check-auth", "/api/auth/change-password").permitAll() // Custom JWT validation
-                .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated() // Avatar endpoints require auth
-                .requestMatchers("/api/users/profile").authenticated() // User profile endpoint requires auth
-                .requestMatchers("/api/oauth2/**").permitAll() // Add this line
-                .requestMatchers("/api/cognito/**").hasRole("ADMIN") // Cognito sync endpoints require ADMIN role
-                .requestMatchers("/api/test/**").permitAll() // Test endpoints
-                .requestMatchers("/api/aws/**").permitAll() // AWS test endpoints
-                // Allow public access to OAuth2 login
+                .requestMatchers("/api/auth/check-auth", "/api/auth/change-password").permitAll()
+                .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated()
+                .requestMatchers("/api/users/profile").authenticated()
+                .requestMatchers("/api/oauth2/**").permitAll()
+                .requestMatchers("/api/cognito/**").hasRole("ADMIN")
+                .requestMatchers("/api/test/**").permitAll()
+                .requestMatchers("/api/aws/**").permitAll()
                 .requestMatchers("/login/oauth2/**").permitAll()
                 .requestMatchers("/oauth2/**").permitAll()
-                // Allow public access to static files (avatars)
                 .requestMatchers("/uploads/**").permitAll()
-                // Require authentication for all other requests
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
