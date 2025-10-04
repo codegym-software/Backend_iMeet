@@ -75,7 +75,10 @@ public class AuthController {
                 null, 
                 user.getId(), 
                 user.getUsername(), 
-                user.getFullName()
+                user.getFullName(),
+                user.getEmail(),
+                user.getAvatarUrl(),
+                user.getRole().name()
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error getting user info: " + e.getMessage());

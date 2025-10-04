@@ -62,7 +62,7 @@ public class AuthService {
         userRepository.save(user);
         
 
-        return new LoginResponse(true, "Đăng nhập thành công", token, user.getId(), user.getUsername(), user.getFullName(), user.getAvatarUrl());
+        return new LoginResponse(true, "Đăng nhập thành công", token, user.getId(), user.getUsername(), user.getFullName(), user.getEmail(), user.getAvatarUrl(), user.getRole().name());
     }
 
     public SignupResponse signup(String username, String email, String password, String fullName) {
