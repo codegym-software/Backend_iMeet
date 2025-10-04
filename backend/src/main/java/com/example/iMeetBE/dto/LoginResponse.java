@@ -111,3 +111,4 @@ public class LoginResponse {
         this.role = role;
     }
 }
+    

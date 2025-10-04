@@ -1,5 +1,6 @@
 package com.example.iMeetBE.service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,9 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private CognitoService cognitoService;
+
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         OAuth2User oauth2User = super.loadUser(userRequest);
@@ -36,43 +40,16 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             String fullName = oauth2User.getAttribute("name"); // Cognito name
             String pictureUrl = oauth2User.getAttribute("picture"); // Google picture URL
             String cognitoId = oauth2User.getAttribute("sub"); // Cognito user ID
-            
 
             if (email == null) {
                 throw new OAuth2AuthenticationException("Email not found from OAuth2 provider");
             }
 
-            Optional<User> existingUser = userRepository.findByEmail(email);
+            // Sử dụng CognitoService để tạo/cập nhật user
+            cognitoService.createOrUpdateUserFromOAuth2(email, username, fullName, pictureUrl, cognitoId);
             
-            if (existingUser.isPresent()) {
-                // Update existing user with Cognito information
-                User user = existingUser.get();
-                if (user.getGoogleId() == null) { // Assuming you're using googleId field for OAuth providers
-                    user.setGoogleId(cognitoId);
-                    if (fullName != null && user.getFullName() == null) {
-                        user.setFullName(fullName);
-                    }
-                    if (pictureUrl != null) {
-                        user.setAvatarUrl(pictureUrl); // Lưu Google picture vào avatar_url
-                    }
-                    userRepository.save(user);
-                }
-            } else {
-                // Create new user from OAuth2 information
-                User newUser = new User();
-                newUser.setId(cognitoId); // Sử dụng sub làm id
-                newUser.setEmail(email);
-                newUser.setUsername(username != null ? username : email);
-                newUser.setFullName(fullName != null ? fullName : username);
-                newUser.setAvatarUrl(pictureUrl); // Lưu Google picture vào avatar_url
-                newUser.setGoogleId(cognitoId);
-                newUser.setRole(UserRole.USER);
-                // No password needed for OAuth2 users
-                newUser.setPasswordHash(""); // or use a placeholder
-                
-                userRepository.save(newUser);
-            }
         } catch (Exception e) {
+            System.err.println("Error processing OAuth2 user: " + e.getMessage());
             throw new OAuth2AuthenticationException("Error processing OAuth2 user: " + e.getMessage());
         }
     }
