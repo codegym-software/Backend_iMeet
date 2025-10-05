@@ -23,29 +23,29 @@ public class ForgotPasswordController {
     private ForgotPasswordService forgotPasswordService;
     
     @PostMapping("/send-code")
-    public ResponseEntity<ApiResponse> sendVerificationCode(@RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<ApiResponse<Object>> sendVerificationCode(@RequestBody ForgotPasswordRequest request) {
         try {
-            ApiResponse response = forgotPasswordService.sendVerificationCode(request.getEmail());
+            ApiResponse<Object> response = forgotPasswordService.sendVerificationCode(request.getEmail());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, e.getMessage()));
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, e.getMessage()));
         }
     }
     
     @PostMapping("/verify-code")
-    public ResponseEntity<ApiResponse> verifyCode(@RequestBody VerifyCodeRequest request) {
+    public ResponseEntity<ApiResponse<Object>> verifyCode(@RequestBody VerifyCodeRequest request) {
         try {
-            ApiResponse response = forgotPasswordService.verifyCode(request.getEmail(), request.getCode());
+            ApiResponse<Object> response = forgotPasswordService.verifyCode(request.getEmail(), request.getCode());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, e.getMessage()));
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, e.getMessage()));
         }
     }
     
     @PostMapping("/reset-password")
-    public ResponseEntity<ApiResponse> resetPassword(@RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<ApiResponse<Object>> resetPassword(@RequestBody ResetPasswordRequest request) {
         try {
-            ApiResponse response = forgotPasswordService.resetPassword(
+            ApiResponse<Object> response = forgotPasswordService.resetPassword(
                 request.getEmail(), 
                 request.getCode(), 
                 request.getNewPassword(), 
@@ -53,8 +53,9 @@ public class ForgotPasswordController {
             );
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, e.getMessage()));
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, e.getMessage()));
         }
     }
     
 }
+//

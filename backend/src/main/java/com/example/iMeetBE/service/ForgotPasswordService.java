@@ -44,7 +44,7 @@ public class ForgotPasswordService {
         public boolean isExpired() { return LocalDateTime.now().isAfter(expiresAt); }
     }
     
-    public ApiResponse sendVerificationCode(String email) {
+    public ApiResponse<Object> sendVerificationCode(String email) {
         try {
             User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại trong hệ thống"));
@@ -59,14 +59,14 @@ public class ForgotPasswordService {
             
             emailService.sendVerificationCode(email, code);
             
-            return new ApiResponse(true, "Mã xác minh đã được gửi đến email của bạn");
+            return new ApiResponse<>(true, "Mã xác minh đã được gửi đến email của bạn");
             
         } catch (Exception e) {
-            return new ApiResponse(false, e.getMessage());
+            return new ApiResponse<>(false, e.getMessage());
         }
     }
     
-    public ApiResponse verifyCode(String email, String code) {
+    public ApiResponse<Object> verifyCode(String email, String code) {
         try {
             VerificationData verificationData = verificationCodes.get(email);
             
@@ -87,21 +87,21 @@ public class ForgotPasswordService {
                 throw new RuntimeException("Mã xác minh không đúng");
             }
             
-            return new ApiResponse(true, "Mã xác minh hợp lệ");
+            return new ApiResponse<>(true, "Mã xác minh hợp lệ");
             
         } catch (Exception e) {
-            return new ApiResponse(false, e.getMessage());
+            return new ApiResponse<>(false, e.getMessage());
         }
     }
     
-    public ApiResponse resetPassword(String email, String code, String newPassword, String confirmPassword) {
+    public ApiResponse<Object> resetPassword(String email, String code, String newPassword, String confirmPassword) {
         try {
             if (!newPassword.equals(confirmPassword)) {
-                return new ApiResponse(false, "Mật khẩu xác nhận không khớp");
+                return new ApiResponse<>(false, "Mật khẩu xác nhận không khớp");
             }
             
             if (newPassword.length() < 6) {
-                return new ApiResponse(false, "Mật khẩu phải có ít nhất 6 ký tự");
+                return new ApiResponse<>(false, "Mật khẩu phải có ít nhất 6 ký tự");
             }
             
             VerificationData verificationData = verificationCodes.get(email);
@@ -131,10 +131,10 @@ public class ForgotPasswordService {
             
             verificationCodes.remove(email);
             
-            return new ApiResponse(true, "Đặt lại mật khẩu thành công");
+            return new ApiResponse<>(true, "Đặt lại mật khẩu thành công");
             
         } catch (Exception e) {
-            return new ApiResponse(false, e.getMessage());
+            return new ApiResponse<>(false, e.getMessage());
         }
     }
     
@@ -144,3 +144,4 @@ public class ForgotPasswordService {
         return String.valueOf(code);
     }
 }
+//
