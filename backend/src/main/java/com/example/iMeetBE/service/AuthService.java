@@ -1,6 +1,7 @@
 package com.example.iMeetBE.service;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,20 @@ public class AuthService {
 
     @Autowired
     private CognitoService cognitoService;
+
+    @Autowired
+    private BidirectionalSyncService bidirectionalSyncService;
+    
+    /**
+     * Tạo ID ngẫu nhiên cho traditional users
+     */
+    private String generateRandomUserId() {
+        String randomId;
+        do {
+            randomId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        } while (userRepository.findById(randomId).isPresent());
+        return randomId;
+    }
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -62,7 +77,7 @@ public class AuthService {
         userRepository.save(user);
         
 
-        return new LoginResponse(true, "Đăng nhập thành công", token, user.getId(), user.getUsername(), user.getFullName(), user.getAvatarUrl());
+        return new LoginResponse(true, "Đăng nhập thành công", token, user.getId(), user.getUsername(), user.getFullName(), user.getEmail(), user.getAvatarUrl(), user.getRole().name());
     }
 
     public SignupResponse signup(String username, String email, String password, String fullName) {
@@ -75,9 +90,7 @@ public class AuthService {
         }
 
         User user = new User();
-        // Tạo ID duy nhất cho traditional user (có thể sử dụng UUID hoặc email-based)
-        String userId = "traditional_" + email.replace("@", "_").replace(".", "_");
-        user.setId(userId);
+        user.setId(generateRandomUserId());
         user.setUsername(username);
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
@@ -88,11 +101,9 @@ public class AuthService {
 
         // Tự động đồng bộ user lên Cognito (optional)
         try {
-            if (!cognitoService.userExistsInCognito(email)) {
-                cognitoService.createUserInCognito(user);
-            }
+            cognitoService.createUserInCognitoFromDatabase(user);
         } catch (Exception e) {
-            System.err.println("⚠️ Không thể đồng bộ user lên Cognito: " + e.getMessage());
+            System.err.println("Không thể đồng bộ user lên Cognito: " + e.getMessage());
             // Không throw exception để không ảnh hưởng đến signup process
         }
 

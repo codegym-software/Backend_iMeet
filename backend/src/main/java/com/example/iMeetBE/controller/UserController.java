@@ -101,5 +101,6 @@ public class UserController {
                 false, "Failed to update user profile: " + e.getMessage()
             ));
         }
+
     }
 }

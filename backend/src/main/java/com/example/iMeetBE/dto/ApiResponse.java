@@ -1,9 +1,9 @@
 package com.example.iMeetBE.dto;
 
-public class ApiResponse {
+public class ApiResponse<T> {
     private boolean success;
     private String message;
-    private Object data;
+    private T data;
 
     public ApiResponse() {}
 
@@ -12,7 +12,7 @@ public class ApiResponse {
         this.message = message;
     }
 
-    public ApiResponse(boolean success, String message, Object data) {
+    public ApiResponse(boolean success, String message, T data) {
         this.success = success;
         this.message = message;
         this.data = data;
@@ -34,11 +34,37 @@ public class ApiResponse {
         this.message = message;
     }
 
-    public Object getData() {
+    public T getData() {
         return data;
     }
 
-    public void setData(Object data) {
+    public void setData(T data) {
         this.data = data;
     }
+    
+    // Static factory methods
+    public static <T> ApiResponse<T> success(T data, String message) {
+        ApiResponse<T> response = new ApiResponse<>();
+        response.setSuccess(true);
+        response.setMessage(message);
+        response.setData(data);
+        return response;
+    }
+    
+    public static <T> ApiResponse<T> success(T data) {
+        return success(data, "Thành công");
+    }
+    
+    public static <T> ApiResponse<T> success(String message) {
+        return success(null, message);
+    }
+    
+    public static <T> ApiResponse<T> error(String message) {
+        ApiResponse<T> response = new ApiResponse<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        response.setData(null);
+        return response;
+    }
 }
+//
