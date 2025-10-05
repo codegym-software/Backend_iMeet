@@ -41,7 +41,7 @@ public class SecurityConfig {
                 corsConfiguration.setAllowedOriginPatterns(java.util.List.of("*"));
                 corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                 corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
-                corsConfiguration.setAllowCredentials(true);
+                corsConfiguration.setAllowCredentials(false);
                 return corsConfiguration;
             }))
             .csrf(csrf -> csrf.disable())
@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/check-auth", "/api/auth/change-password").permitAll()
                 .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated()
                 .requestMatchers("/api/users/profile").authenticated()
+                .requestMatchers("/api/rooms/**").permitAll() // Cho phép test API rooms mà không cần authentication
                 .requestMatchers("/api/oauth2/**").permitAll()
                 .requestMatchers("/api/cognito/**").hasRole("ADMIN")
                 .requestMatchers("/api/test/**").permitAll()
