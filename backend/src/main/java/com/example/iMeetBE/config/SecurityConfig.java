@@ -20,7 +20,7 @@ import com.example.iMeetBE.service.CustomUserDetailsService;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
+//
     @Autowired
     private CustomOAuth2UserService customOAuth2UserService;
 
