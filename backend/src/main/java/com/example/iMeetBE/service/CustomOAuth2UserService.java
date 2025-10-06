@@ -1,8 +1,5 @@
 package com.example.iMeetBE.service;
 
-import java.time.LocalDateTime;
-import java.util.Optional;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -10,8 +7,6 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
-import com.example.iMeetBE.model.User;
-import com.example.iMeetBE.model.UserRole;
 import com.example.iMeetBE.repository.UserRepository;
 
 @Service

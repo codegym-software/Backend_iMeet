@@ -1,6 +1,10 @@
 # Compiled class file
 *.class
 
+target/
+Dockerfile
+.dockerignore
+fly.toml
 # Log file
 *.log
 
