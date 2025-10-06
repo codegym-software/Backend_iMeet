@@ -20,7 +20,7 @@ import com.example.iMeetBE.service.CustomUserDetailsService;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-//
+
     @Autowired
     private CustomOAuth2UserService customOAuth2UserService;
 
@@ -38,10 +38,10 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(request -> {
                 var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
-                corsConfiguration.setAllowedOriginPatterns(java.util.List.of("*"));
-                corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                corsConfiguration.setAllowedOriginPatterns(java.util.List.of("http://localhost:3000"));
+                corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                 corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
-                corsConfiguration.setAllowCredentials(false);
+                corsConfiguration.setAllowCredentials(true); // Cho phép credentials từ frontend
                 return corsConfiguration;
             }))
             .csrf(csrf -> csrf.disable())
