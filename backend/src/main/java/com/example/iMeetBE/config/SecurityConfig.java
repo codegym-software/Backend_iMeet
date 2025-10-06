@@ -38,7 +38,7 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(request -> {
                 var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
-                corsConfiguration.setAllowedOriginPatterns(java.util.List.of("http://localhost:3000"));
+                corsConfiguration.setAllowedOriginPatterns(java.util.List.of("http://localhost:3000", "http://localhost:8080", "http://localhost:8081"));
                 corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                 corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
                 corsConfiguration.setAllowCredentials(true); // Cho phép credentials từ frontend
@@ -55,6 +55,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated()
                 .requestMatchers("/api/users/profile").authenticated()
                 .requestMatchers("/api/rooms/**").permitAll() // Cho phép test API rooms mà không cần authentication
+                .requestMatchers("/api/devices/**").permitAll() // Cho phép test API devices mà không cần authentication
                 .requestMatchers("/api/oauth2/**").permitAll()
                 .requestMatchers("/api/cognito/**").hasRole("ADMIN")
                 .requestMatchers("/api/test/**").permitAll()

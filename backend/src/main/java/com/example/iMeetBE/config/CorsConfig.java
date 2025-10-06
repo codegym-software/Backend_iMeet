@@ -14,7 +14,10 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOriginPatterns("http://localhost:3000")
+                        // ✅ Cho phép origin frontend
+                        .allowedOriginPatterns("http://localhost:3000") 
+                        // ✅ Nếu sau này bạn deploy, thêm vào như sau:
+                        // .allowedOriginPatterns("http://localhost:3000", "https://your-domain.com")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                         .allowedHeaders("*")
                         .allowCredentials(true);
