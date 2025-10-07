@@ -28,6 +28,7 @@ public class DeviceService {
     private DeviceRepository deviceRepository;
     
     // Tạo thiết bị mới
+    @Transactional(rollbackFor = Exception.class)
     public ApiResponse<DeviceResponse> createDevice(DeviceRequest request) {
         try {
             // Kiểm tra tên thiết bị đã tồn tại chưa
@@ -45,7 +46,10 @@ public class DeviceService {
             DeviceResponse response = convertToResponse(savedDevice);
             
             return ApiResponse.success(response, "Tạo thiết bị thành công");
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            return ApiResponse.error("Lỗi dữ liệu: Tên thiết bị có thể đã tồn tại hoặc vi phạm ràng buộc dữ liệu");
         } catch (Exception e) {
+            e.printStackTrace(); // Log chi tiết lỗi
             return ApiResponse.error("Lỗi khi tạo thiết bị: " + e.getMessage());
         }
     }
@@ -177,11 +181,12 @@ public class DeviceService {
             long laptopCount = deviceRepository.countByDeviceType(DeviceType.LAPTOP);
             long bangCount = deviceRepository.countByDeviceType(DeviceType.BANG);
             long manHinhCount = deviceRepository.countByDeviceType(DeviceType.MAN_HINH);
+            long mayChieuCount = deviceRepository.countByDeviceType(DeviceType.MAY_CHIEU);
             long khacCount = deviceRepository.countByDeviceType(DeviceType.KHAC);
             
             DeviceStatistics statistics = new DeviceStatistics(
                 totalDevices, micCount, camCount, laptopCount, 
-                bangCount, manHinhCount, khacCount
+                bangCount, manHinhCount, mayChieuCount, khacCount
             );
             
             return ApiResponse.success(statistics, "Lấy thống kê thiết bị thành công");
@@ -198,16 +203,18 @@ public class DeviceService {
         public final long laptopCount;
         public final long bangCount;
         public final long manHinhCount;
+        public final long mayChieuCount;
         public final long khacCount;
         
         public DeviceStatistics(long totalDevices, long micCount, long camCount, 
-                              long laptopCount, long bangCount, long manHinhCount, long khacCount) {
+                              long laptopCount, long bangCount, long manHinhCount, long mayChieuCount, long khacCount) {
             this.totalDevices = totalDevices;
             this.micCount = micCount;
             this.camCount = camCount;
             this.laptopCount = laptopCount;
             this.bangCount = bangCount;
             this.manHinhCount = manHinhCount;
+            this.mayChieuCount = mayChieuCount;
             this.khacCount = khacCount;
         }
     }

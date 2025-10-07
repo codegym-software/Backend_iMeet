@@ -6,6 +6,7 @@ public enum DeviceType {
     LAPTOP("Laptop"),
     BANG("Bảng")    ,
     MAN_HINH("Màn hình"),
+    MAY_CHIEU("Máy chiếu"),
     KHAC("Khác");
     
     private final String displayName;

@@ -26,7 +26,7 @@ public class Device {
     private String name;
     
     @Enumerated(EnumType.STRING)
-    @Column(name = "device_type", nullable = false)
+    @Column(name = "device_type", nullable = false, length = 50)
     private DeviceType deviceType;
     
     @Column(name = "quantity")
