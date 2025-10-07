@@ -14,10 +14,10 @@ public class OAuth2ErrorController {
             // Log the error and redirect to frontend with error information
             
             // Redirect to frontend login page with error
-            return new RedirectView("http://localhost:3000/login?oauth_error=true");
+            return new RedirectView("http://localhost:3000/login?oauth_error=true","http://localhost:3001/login?oauth_error=true"); // Default to port 3000
         }
         
         // Normal login redirect
-        return new RedirectView("http://localhost:3000/login");
+        return new RedirectView("http://localhost:3000/login","http://localhost:3001/login"); // Default to port 3000
     }
 }
