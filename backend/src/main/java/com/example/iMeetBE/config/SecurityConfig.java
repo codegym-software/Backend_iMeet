@@ -38,10 +38,10 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(request -> {
                 var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
-                corsConfiguration.setAllowedOriginPatterns(java.util.List.of("*"));
-                corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                corsConfiguration.setAllowedOriginPatterns(java.util.List.of("http://localhost:3000", "http://localhost:3001", "http://localhost:8081"));
+                corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                 corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
-                corsConfiguration.setAllowCredentials(true);
+                corsConfiguration.setAllowCredentials(true); // Cho phép credentials từ frontend
                 return corsConfiguration;
             }))
             .csrf(csrf -> csrf.disable())
@@ -54,6 +54,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/check-auth", "/api/auth/change-password").permitAll()
                 .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated()
                 .requestMatchers("/api/users/profile").authenticated()
+                .requestMatchers("/api/rooms/**").permitAll() // Cho phép test API rooms mà không cần authentication
+                .requestMatchers("/api/devices/**").permitAll() 
+                .requestMatchers("/api/room-devices/**").permitAll() // Cho phép test API devices mà không cần authentication
                 .requestMatchers("/api/oauth2/**").permitAll()
                 .requestMatchers("/api/cognito/**").hasRole("ADMIN")
                 .requestMatchers("/api/test/**").permitAll()
@@ -88,7 +91,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler() {
         SimpleUrlAuthenticationSuccessHandler handler = new SimpleUrlAuthenticationSuccessHandler();
-        handler.setDefaultTargetUrl("http://localhost:3000/oauth2/callback"); // Always redirect to callback
+        handler.setDefaultTargetUrl("http://localhost:3000/oauth2/callback,http://localhost:3001/oauth2/callback"); // Always redirect to callback (default to 3000)
         handler.setAlwaysUseDefaultTargetUrl(true);
         return handler;
     }

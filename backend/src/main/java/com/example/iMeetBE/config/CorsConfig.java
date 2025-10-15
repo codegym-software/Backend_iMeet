@@ -13,9 +13,12 @@ public class CorsConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**") // Cho phép tất cả các endpoint
-                        .allowedOrigins("http://localhost:3000") // ReactJS chạy trên cổng 3000
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                registry.addMapping("/**")
+                        // ✅ Cho phép origin frontend (port 3000 và 3001)
+                        .allowedOriginPatterns("http://localhost:3000", "http://localhost:3001") 
+                        // ✅ Nếu sau này bạn deploy, thêm vào như sau:
+                        // .allowedOriginPatterns("http://localhost:3000", "http://localhost:3001", "https://your-domain.com")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                         .allowedHeaders("*")
                         .allowCredentials(true);
             }

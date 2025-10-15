@@ -21,7 +21,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
 public class UserController {
 
     @Autowired
@@ -101,5 +101,6 @@ public class UserController {
                 false, "Failed to update user profile: " + e.getMessage()
             ));
         }
+
     }
 }

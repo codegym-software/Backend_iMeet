@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import com.example.iMeetBE.config.CognitoHostedUIConfig;
+import com.example.iMeetBE.service.CognitoService;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,7 +34,7 @@ import jakarta.servlet.http.HttpSession;
 
 @RestController
 @RequestMapping("/api/oauth2")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
 public class OAuth2Controller {
 
     @GetMapping("/hosted-ui/login-url-force")
@@ -47,6 +48,9 @@ public class OAuth2Controller {
 
     @Autowired
     private CognitoHostedUIConfig cognitoConfig;
+
+    @Autowired
+    private CognitoService cognitoService;
 
     @Value("${spring.security.oauth2.client.registration.cognito.client-id}")
     private String clientId;
@@ -76,6 +80,16 @@ public class OAuth2Controller {
             if (name == null) name = "";
             if (picture == null) picture = "";
             if (sub == null) sub = "";
+            
+            // Tự động lưu user vào database khi đăng nhập OAuth2
+            try {
+                if (email != null && !email.isEmpty()) {
+                    cognitoService.createOrUpdateUserFromOAuth2(email, username, name, picture, sub);
+                }
+            } catch (Exception e) {
+                System.err.println("Warning: Could not save OAuth2 user to database: " + e.getMessage());
+                // Không throw exception để không ảnh hưởng đến quá trình đăng nhập
+            }
             
             return Map.of(
                 "authenticated", true,
@@ -164,7 +178,7 @@ public class OAuth2Controller {
             "client_id=%s&" +
             "logout_uri=%s",
             clientId,
-            "http://localhost:3000/login"
+            "http://localhost:3000/login,http://localhost:3001/login"
         );
         
         return Map.of(
@@ -182,7 +196,7 @@ public class OAuth2Controller {
             "logout_uri=%s&" +
             "response_mode=query",
             clientId,
-            "http://localhost:3000/login"
+            "http://localhost:3000/login,http://localhost:3001/login"
         );
         
         return ResponseEntity.status(HttpStatus.FOUND)
@@ -226,7 +240,7 @@ public class OAuth2Controller {
             body.add("grant_type", "authorization_code");
             body.add("client_id", clientId);
             body.add("code", authorizationCode);
-            body.add("redirect_uri", "http://localhost:3000/oauth2/callback");
+            body.add("redirect_uri", "http://localhost:3000/oauth2/callback,http://localhost:3001/oauth2/callback");
 
             // Chuẩn bị headers với Basic Authentication
             HttpHeaders headers = new HttpHeaders();
@@ -283,6 +297,49 @@ public class OAuth2Controller {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", "Error exchanging code: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Kiểm tra và đồng bộ user OAuth2 vào database
+     */
+    @PostMapping("/sync-user")
+    public Map<String, Object> syncOAuth2User(@AuthenticationPrincipal OAuth2User principal) {
+        try {
+            if (principal == null) {
+                return Map.of("success", false, "error", "No authenticated user found");
+            }
+            
+            String email = principal.getAttribute("email");
+            String username = principal.getAttribute("username");
+            String name = principal.getAttribute("name");
+            String picture = principal.getAttribute("picture");
+            String sub = principal.getAttribute("sub");
+            
+            if (email == null || email.isEmpty()) {
+                return Map.of("success", false, "error", "Email not found in OAuth2 user");
+            }
+            
+            // Đồng bộ user vào database
+            com.example.iMeetBE.model.User user = cognitoService.createOrUpdateUserFromOAuth2(
+                email, username, name, picture, sub
+            );
+            
+            return Map.of(
+                "success", true,
+                "message", "User synced to database successfully",
+                "user", Map.of(
+                    "id", user.getId(),
+                    "email", user.getEmail(),
+                    "username", user.getUsername(),
+                    "fullName", user.getFullName(),
+                    "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
+                    "googleId", user.getGoogleId() != null ? user.getGoogleId() : ""
+                )
+            );
+            
+        } catch (Exception e) {
+            return Map.of("success", false, "error", "Failed to sync user: " + e.getMessage());
         }
     }
 }

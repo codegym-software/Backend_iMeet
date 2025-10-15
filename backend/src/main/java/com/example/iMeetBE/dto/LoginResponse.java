@@ -7,7 +7,9 @@ public class LoginResponse {
     private String userId;
     private String username;
     private String fullName;
+    private String email;
     private String avatarUrl;
+    private String role;
 
     public LoginResponse() {}
 
@@ -25,14 +27,16 @@ public class LoginResponse {
         this.fullName = fullName;
     }
 
-    public LoginResponse(boolean success, String message, String token, String userId, String username, String fullName, String avatarUrl) {
+    public LoginResponse(boolean success, String message, String token, String userId, String username, String fullName, String email, String avatarUrl, String role) {
         this.success = success;
         this.message = message;
         this.token = token;
         this.userId = userId;
         this.username = username;
         this.fullName = fullName;
+        this.email = email;
         this.avatarUrl = avatarUrl;
+        this.role = role;
     }
 
     public boolean isSuccess() {
@@ -83,6 +87,14 @@ public class LoginResponse {
         this.fullName = fullName;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
     public String getAvatarUrl() {
         return avatarUrl;
     }
@@ -90,4 +102,13 @@ public class LoginResponse {
     public void setAvatarUrl(String avatarUrl) {
         this.avatarUrl = avatarUrl;
     }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
 }
+    
