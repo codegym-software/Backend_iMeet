@@ -34,6 +34,9 @@ public class Device {
     
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "used_count", nullable = false)
+    private Integer usedCount = 0;
     
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -90,6 +93,14 @@ public class Device {
     
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Integer getUsedCount() {
+        return usedCount;
+    }
+
+    public void setUsedCount(Integer usedCount) {
+        this.usedCount = usedCount;
     }
     
     public LocalDateTime getCreatedAt() {

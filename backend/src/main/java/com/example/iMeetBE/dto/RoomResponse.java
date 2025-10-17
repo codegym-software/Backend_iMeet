@@ -3,7 +3,6 @@ package com.example.iMeetBE.dto;
 import java.time.LocalDateTime;
 
 import com.example.iMeetBE.model.Room;
-import com.example.iMeetBE.model.RoomStatus;
 
 public class RoomResponse {
     
@@ -12,7 +11,6 @@ public class RoomResponse {
     private String location;
     private Integer capacity;
     private String description;
-    private RoomStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -25,7 +23,6 @@ public class RoomResponse {
         this.location = room.getLocation();
         this.capacity = room.getCapacity();
         this.description = room.getDescription();
-        this.status = room.getStatus();
         this.createdAt = room.getCreatedAt();
         this.updatedAt = room.getUpdatedAt();
     }
@@ -69,14 +66,6 @@ public class RoomResponse {
     
     public void setDescription(String description) {
         this.description = description;
-    }
-    
-    public RoomStatus getStatus() {
-        return status;
-    }
-    
-    public void setStatus(RoomStatus status) {
-        this.status = status;
     }
     
     public LocalDateTime getCreatedAt() {

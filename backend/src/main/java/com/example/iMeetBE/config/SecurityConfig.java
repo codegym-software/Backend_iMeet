@@ -55,6 +55,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated()
                 .requestMatchers("/api/users/profile").authenticated()
                 .requestMatchers("/api/rooms/**").permitAll() // Cho phép test API rooms mà không cần authentication
+                .requestMatchers("/api//**").permitAll() 
                 .requestMatchers("/api/devices/**").permitAll() 
                 .requestMatchers("/api/room-devices/**").permitAll() // Cho phép test API devices mà không cần authentication
                 .requestMatchers("/api/oauth2/**").permitAll()
