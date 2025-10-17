@@ -49,7 +49,6 @@ public class DeviceService {
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             return ApiResponse.error("Lỗi dữ liệu: Tên thiết bị có thể đã tồn tại hoặc vi phạm ràng buộc dữ liệu");
         } catch (Exception e) {
-            e.printStackTrace(); // Log chi tiết lỗi
             return ApiResponse.error("Lỗi khi tạo thiết bị: " + e.getMessage());
         }
     }
@@ -227,6 +226,7 @@ public class DeviceService {
             device.getDeviceType(),
             device.getQuantity(),
             device.getDescription(),
+            device.getUsedCount(),
             device.getCreatedAt(),
             device.getUpdatedAt()
         );

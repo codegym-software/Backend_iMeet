@@ -72,16 +72,20 @@ public class RoomDeviceService {
             roomDevice.setNotes(request.getNotes());
             
             RoomDevice savedRoomDevice = roomDeviceRepository.save(roomDevice);
-            
-            // Cập nhật số lượng thiết bị trong database (trừ đi số lượng đã gán)
-            device.setQuantity(device.getQuantity() - request.getQuantityAssigned());
+
+            // Cập nhật số lượng và used_count của thiết bị (trừ đi số lượng đã gán và tăng used_count)
+            Integer assignedVal = request.getQuantityAssigned();
+            int assigned = assignedVal == null ? 0 : assignedVal;
+            Integer currentQtyVal = device.getQuantity();
+            int currentQty = currentQtyVal == null ? 0 : currentQtyVal;
+            device.setQuantity(currentQty - assigned);
+            device.setUsedCount(Math.max(0, (device.getUsedCount() == null ? 0 : device.getUsedCount()) + assigned));
             deviceRepository.save(device);
             
             RoomDeviceResponse response = convertToResponse(savedRoomDevice);
             
             return ApiResponse.success(response, "Gán thiết bị cho phòng thành công");
         } catch (Exception e) {
-            e.printStackTrace();
             return ApiResponse.error("Lỗi khi gán thiết bị cho phòng: " + e.getMessage());
         }
     }
@@ -132,7 +136,7 @@ public class RoomDeviceService {
             int newQuantity = request.getQuantityAssigned();
             
             // Tính chênh lệch số lượng
-            int quantityDifference = newQuantity - oldQuantity;
+            int quantityDifference = (newQuantity == 0 ? 0 : newQuantity) - oldQuantity;
             
             // Kiểm tra số lượng thiết bị có đủ không (nếu tăng số lượng)
             if (quantityDifference > 0 && quantityDifference > roomDevice.getDevice().getQuantity()) {
@@ -144,11 +148,15 @@ public class RoomDeviceService {
             
             RoomDevice savedRoomDevice = roomDeviceRepository.save(roomDevice);
             
-            // Cập nhật số lượng thiết bị trong database
-            // Nếu số lượng mới > cũ: trừ thêm (quantityDifference > 0)
-            // Nếu số lượng mới < cũ: cộng lại (quantityDifference < 0)
+            // Cập nhật số lượng và used_count thiết bị trong database
+            // Nếu quantityDifference > 0: trừ thêm và tăng used_count
+            // Nếu quantityDifference < 0: cộng lại và giảm used_count
             Device device = roomDevice.getDevice();
             device.setQuantity(device.getQuantity() - quantityDifference);
+            Integer usedCountVal = device.getUsedCount();
+            int currentUsed = usedCountVal == null ? 0 : usedCountVal;
+            int newUsed = currentUsed + quantityDifference; // quantityDifference âm sẽ giảm used_count
+            device.setUsedCount(Math.max(0, newUsed));
             deviceRepository.save(device);
             
             RoomDeviceResponse response = convertToResponse(savedRoomDevice);
@@ -171,19 +179,14 @@ public class RoomDeviceService {
             int quantityToReturn = roomDevice.getQuantityAssigned();
             Device device = roomDevice.getDevice();
             
-            // Log thông tin trước khi xóa
-            System.out.println("Trước khi xóa - Device ID: " + device.getDeviceId() + 
-                             ", Tên: " + device.getName() + 
-                             ", Số lượng hiện tại: " + device.getQuantity() + 
-                             ", Số lượng sẽ trả lại: " + quantityToReturn);
-            
-            // Cộng lại số lượng thiết bị trong database TRƯỚC khi xóa
-            int oldQuantity = device.getQuantity();
+            // Cộng lại số lượng thiết bị trong database TRƯỚC khi xóa và giảm used_count tương ứng
+            Integer oldQuantityVal = device.getQuantity();
+            int oldQuantity = oldQuantityVal == null ? 0 : oldQuantityVal;
             device.setQuantity(oldQuantity + quantityToReturn);
+            Integer currentUsedVal = device.getUsedCount();
+            int currentUsed = currentUsedVal == null ? 0 : currentUsedVal;
+            device.setUsedCount(Math.max(0, currentUsed - quantityToReturn));
             deviceRepository.save(device);
-            
-            // Log thông tin sau khi cập nhật
-            System.out.println("Sau khi cập nhật - Số lượng mới: " + device.getQuantity());
             
             // Xóa gán thiết bị
             roomDeviceRepository.deleteById(id);

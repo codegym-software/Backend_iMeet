@@ -11,6 +11,7 @@ public class DeviceResponse {
     private DeviceType deviceType;
     private Integer quantity;
     private String description;
+    private Integer usedCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -18,12 +19,13 @@ public class DeviceResponse {
     public DeviceResponse() {}
     
     public DeviceResponse(Long deviceId, String name, DeviceType deviceType, Integer quantity, 
-                         String description, LocalDateTime createdAt, LocalDateTime updatedAt) {
+                         String description, Integer usedCount, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.deviceId = deviceId;
         this.name = name;
         this.deviceType = deviceType;
         this.quantity = quantity;
         this.description = description;
+        this.usedCount = usedCount;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -67,6 +69,14 @@ public class DeviceResponse {
     
     public void setDescription(String description) {
         this.description = description;
+    }
+    
+    public Integer getUsedCount() {
+        return usedCount;
+    }
+    
+    public void setUsedCount(Integer usedCount) {
+        this.usedCount = usedCount;
     }
     
     public LocalDateTime getCreatedAt() {
