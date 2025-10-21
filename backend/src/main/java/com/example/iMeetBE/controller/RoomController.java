@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -22,6 +23,8 @@ import com.example.iMeetBE.dto.RoomRequest;
 import com.example.iMeetBE.dto.RoomResponse;
 import com.example.iMeetBE.model.Room;
 import com.example.iMeetBE.service.RoomService;
+import com.example.iMeetBE.dto.UpdateRoomStatusRequest;
+import com.example.iMeetBE.model.RoomStatus;
 
 import jakarta.validation.Valid;
 
@@ -66,6 +69,36 @@ public class RoomController {
         }
     }
     
+     @GetMapping("/status/{status}")
+    public ResponseEntity<ApiResponse<List<RoomResponse>>> getRoomsByStatus(@PathVariable RoomStatus status) {
+        try {
+            List<Room> rooms = roomService.getRoomsByStatus(status);
+            List<RoomResponse> roomResponses = rooms.stream()
+                .map(RoomResponse::new)
+                .toList();
+            
+            return ResponseEntity.ok(ApiResponse.success(roomResponses, "Lấy danh sách phòng theo trạng thái thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi lấy danh sách phòng theo trạng thái: " + e.getMessage()));
+        }
+    }
+    
+    // Lấy phòng có sẵn
+    @GetMapping("/available")
+    public ResponseEntity<ApiResponse<List<RoomResponse>>> getAvailableRooms() {
+        try {
+            List<Room> rooms = roomService.getAvailableRooms();
+            List<RoomResponse> roomResponses = rooms.stream()
+                .map(RoomResponse::new)
+                .toList();
+            
+            return ResponseEntity.ok(ApiResponse.success(roomResponses, "Lấy danh sách phòng có sẵn thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi lấy danh sách phòng có sẵn: " + e.getMessage()));
+        }
+    }
     
     // Lấy phòng theo sức chứa
     @GetMapping("/capacity/{minCapacity}")
@@ -80,6 +113,19 @@ public class RoomController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Lỗi khi lấy danh sách phòng theo sức chứa: " + e.getMessage()));
+        }
+    }
+
+     @PatchMapping("/{roomId}/status")
+    public ResponseEntity<ApiResponse<RoomResponse>> updateRoomStatus(
+            @PathVariable Integer roomId, 
+            @Valid @RequestBody UpdateRoomStatusRequest request) {
+        try {
+            Room room = roomService.updateRoomStatus(roomId, request.getStatus());
+            return ResponseEntity.ok(ApiResponse.success(new RoomResponse(room), "Cập nhật trạng thái phòng thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("Lỗi khi cập nhật trạng thái phòng: " + e.getMessage()));
         }
     }
     

@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/rooms/**").permitAll() // Cho phép test API rooms mà không cần authentication
                 .requestMatchers("/api//**").permitAll() 
                 .requestMatchers("/api/devices/**").permitAll() 
+                .requestMatchers("/api/meetings/**").permitAll()
                 .requestMatchers("/api/room-devices/**").permitAll() // Cho phép test API devices mà không cần authentication
                 .requestMatchers("/api/oauth2/**").permitAll()
                 .requestMatchers("/api/cognito/**").hasRole("ADMIN")

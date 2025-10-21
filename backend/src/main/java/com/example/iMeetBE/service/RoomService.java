@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.iMeetBE.dto.RoomRequest;
 import com.example.iMeetBE.model.Room;
+import com.example.iMeetBE.model.RoomStatus;
 import com.example.iMeetBE.repository.RoomRepository;
 
 @Service
@@ -26,7 +27,13 @@ public class RoomService {
         return roomRepository.findById(roomId);
     }
     
-    // Removed status-based methods
+    public List<Room> getRoomsByStatus(RoomStatus status) {
+        return roomRepository.findByStatusOrderByName(status);
+    }
+    
+    public List<Room> getAvailableRooms() {
+        return roomRepository.findByStatusOrderByName(RoomStatus.AVAILABLE);
+    }
     
     public List<Room> getRoomsByCapacity(Integer minCapacity) {
         return roomRepository.findByCapacityGreaterThanEqual(minCapacity);
@@ -43,6 +50,7 @@ public class RoomService {
         room.setLocation(roomRequest.getLocation());
         room.setCapacity(roomRequest.getCapacity());
         room.setDescription(roomRequest.getDescription());
+        room.setStatus(RoomStatus.AVAILABLE);
         
         return roomRepository.save(room);
     }
@@ -72,13 +80,21 @@ public class RoomService {
         roomRepository.deleteById(roomId);
     }
     
-    // Removed updateRoomStatus
+    public Room updateRoomStatus(Integer roomId, RoomStatus status) {
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
+        
+        room.setStatus(status);
+        return roomRepository.save(room);
+    }
     
     public List<Room> searchRooms(String searchTerm) {
         return roomRepository.findByNameContainingIgnoreCaseOrLocationContainingIgnoreCase(searchTerm);
     }
     
-    // Removed searchRoomsByStatus
+     public List<Room> searchRoomsByStatus(RoomStatus status, String searchTerm) {
+        return roomRepository.findByStatusAndNameContainingIgnoreCaseOrLocationContainingIgnoreCase(status, searchTerm);
+    }
     
     public List<Room> searchRoomsByCapacity(Integer minCapacity, String searchTerm) {
         return roomRepository.findByCapacityGreaterThanEqualAndNameContainingIgnoreCaseOrLocationContainingIgnoreCase(minCapacity, searchTerm);
