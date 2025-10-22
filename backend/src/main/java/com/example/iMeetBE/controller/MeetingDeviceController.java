@@ -18,15 +18,20 @@ import com.example.iMeetBE.dto.ApiResponse;
 import com.example.iMeetBE.dto.MeetingDeviceRequest;
 import com.example.iMeetBE.dto.MeetingDeviceResponse;
 import com.example.iMeetBE.model.BorrowingStatus;
+import com.example.iMeetBE.model.User;
+import com.example.iMeetBE.repository.UserRepository;
 import com.example.iMeetBE.service.MeetingDeviceService;
 
 @RestController
 @RequestMapping("/api/meeting-devices")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
 public class MeetingDeviceController {
     
     @Autowired
     private MeetingDeviceService meetingDeviceService;
+    
+    @Autowired
+    private UserRepository userRepository;
     
     // Borrow a device for a meeting
     @PostMapping("/borrow")
@@ -34,8 +39,11 @@ public class MeetingDeviceController {
             @RequestBody MeetingDeviceRequest request,
             Authentication authentication) {
         try {
-            String userId = authentication.getName();
-            MeetingDeviceResponse response = meetingDeviceService.borrowDevice(request, userId);
+            String email = authentication.getName();
+            User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+            
+            MeetingDeviceResponse response = meetingDeviceService.borrowDevice(request, user.getId());
             return ResponseEntity.ok(ApiResponse.success(response, "Device borrowed successfully"));
         } catch (Exception e) {
             return ResponseEntity.badRequest()

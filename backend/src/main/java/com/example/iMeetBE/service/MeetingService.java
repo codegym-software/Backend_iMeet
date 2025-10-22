@@ -19,7 +19,6 @@ import com.example.iMeetBE.model.Room;
 import com.example.iMeetBE.model.User;
 import com.example.iMeetBE.repository.MeetingRepository;
 import com.example.iMeetBE.repository.RoomRepository;
-import com.example.iMeetBE.repository.UserRepository;
 
 @Service
 @Transactional
@@ -31,14 +30,12 @@ public class MeetingService {
     @Autowired
     private RoomRepository roomRepository;
     
-    @Autowired
-    private UserRepository userRepository;
     
     @Autowired
     private MeetingDeviceService meetingDeviceService;
     
     // Tạo cuộc họp mới
-    public ApiResponse<MeetingResponse> createMeeting(MeetingRequest request, String userId) {
+    public ApiResponse<MeetingResponse> createMeeting(MeetingRequest request, User user) {
         try {
             // Validate thời gian
             if (request.getEndTime().isBefore(request.getStartTime()) || 
@@ -52,11 +49,7 @@ public class MeetingService {
                 return ApiResponse.error("Không tìm thấy phòng với ID: " + request.getRoomId());
             }
             
-            // Kiểm tra User tồn tại
-            Optional<User> userOpt = userRepository.findById(userId);
-            if (!userOpt.isPresent()) {
-                return ApiResponse.error("Không tìm thấy người dùng với ID: " + userId);
-            }
+            // User đã được validate từ controller
             
             // Kiểm tra xung đột lịch
             boolean hasConflict = meetingRepository.existsConflictingMeeting(
@@ -94,7 +87,7 @@ public class MeetingService {
             meeting.setEndTime(request.getEndTime());
             meeting.setIsAllDay(request.getIsAllDay());
             meeting.setRoom(roomOpt.get());
-            meeting.setUser(userOpt.get());
+            meeting.setUser(user);
             meeting.setBookingStatus(request.getBookingStatus() != null ? 
                                      request.getBookingStatus() : BookingStatus.BOOKED);
             
@@ -113,7 +106,7 @@ public class MeetingService {
                         deviceRequest.setNotes(deviceItem.getNotes());
                         
                         // Mượn thiết bị
-                        meetingDeviceService.borrowDevice(deviceRequest, userId);
+                        meetingDeviceService.borrowDevice(deviceRequest, user.getId());
                     }
                 } catch (Exception e) {
                     // Nếu mượn thiết bị thất bại, xóa cuộc họp đã tạo

@@ -59,10 +59,9 @@ public class MeetingController {
             
             // Tìm user theo email
             User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
-            
-            // Gọi service với userId
-            ApiResponse<MeetingResponse> response = meetingService.createMeeting(request, user.getId());
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
+            // Gọi service với userId - sử dụng user object thay vì chỉ ID
+            ApiResponse<MeetingResponse> response = meetingService.createMeeting(request, user);
             HttpStatus status = response.isSuccess() ? HttpStatus.CREATED : HttpStatus.BAD_REQUEST;
             return ResponseEntity.status(status).body(response);
         } catch (Exception e) {

@@ -49,7 +49,7 @@ public class MeetingDeviceService {
         
         // Validate user exists
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
         
         // Check if device is already borrowed for this meeting
         Optional<MeetingDevice> existingBorrow = meetingDeviceRepository
@@ -60,9 +60,7 @@ public class MeetingDeviceService {
         }
         
         // Check device availability
-        int totalQuantity = device.getQuantity();
-        int borrowedQuantity = meetingDeviceRepository.countBorrowedQuantityByDeviceId(request.getDeviceId());
-        int availableQuantity = totalQuantity - borrowedQuantity;
+        int availableQuantity = device.getQuantity();
         
         if (request.getQuantityBorrowed() > availableQuantity) {
             throw new RuntimeException("Not enough devices available. Available: " + availableQuantity + 
@@ -81,6 +79,12 @@ public class MeetingDeviceService {
         
         MeetingDevice savedDevice = meetingDeviceRepository.save(meetingDevice);
         
+        // Update device quantity - subtract borrowed quantity
+        device.setQuantity(device.getQuantity() - request.getQuantityBorrowed());
+        // Update used count - add borrowed quantity
+        device.setUsedCount(device.getUsedCount() + request.getQuantityBorrowed());
+        deviceRepository.save(device);
+        
         return convertToResponse(savedDevice);
     }
     
@@ -98,6 +102,13 @@ public class MeetingDeviceService {
         
         MeetingDevice savedDevice = meetingDeviceRepository.save(meetingDevice);
         
+        // Update device quantity - add back returned quantity
+        Device device = savedDevice.getDevice();
+        device.setQuantity(device.getQuantity() + savedDevice.getQuantityBorrowed());
+        // Update used count - subtract returned quantity
+        device.setUsedCount(device.getUsedCount() - savedDevice.getQuantityBorrowed());
+        deviceRepository.save(device);
+        
         return convertToResponse(savedDevice);
     }
     
@@ -114,6 +125,13 @@ public class MeetingDeviceService {
         meetingDevice.setReturnedAt(LocalDateTime.now());
         
         MeetingDevice savedDevice = meetingDeviceRepository.save(meetingDevice);
+        
+        // Update device quantity - add back cancelled quantity
+        Device device = savedDevice.getDevice();
+        device.setQuantity(device.getQuantity() + savedDevice.getQuantityBorrowed());
+        // Update used count - subtract cancelled quantity
+        device.setUsedCount(device.getUsedCount() - savedDevice.getQuantityBorrowed());
+        deviceRepository.save(device);
         
         return convertToResponse(savedDevice);
     }
@@ -155,10 +173,8 @@ public class MeetingDeviceService {
         Device device = deviceRepository.findById(deviceId)
             .orElseThrow(() -> new RuntimeException("Device not found"));
         
-        int totalQuantity = device.getQuantity();
-        int borrowedQuantity = meetingDeviceRepository.countBorrowedQuantityByDeviceId(deviceId);
-        
-        return totalQuantity - borrowedQuantity;
+        // Return the current quantity in the device table (already updated when borrowing)
+        return device.getQuantity();
     }
     
     // Convert MeetingDevice entity to MeetingDeviceResponse DTO
