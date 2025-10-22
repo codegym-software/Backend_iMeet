@@ -1,9 +1,11 @@
 package com.example.iMeetBE.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.example.iMeetBE.model.BookingStatus;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -27,12 +29,15 @@ public class MeetingRequest {
     
     private BookingStatus bookingStatus = BookingStatus.BOOKED;
     
+    @Valid
+    private List<MeetingDeviceRequestItem> devices;
+    
     // Constructors
     public MeetingRequest() {}
     
     public MeetingRequest(String title, String description, LocalDateTime startTime, 
                           LocalDateTime endTime, Boolean isAllDay, Integer roomId, 
-                          BookingStatus bookingStatus) {
+                          BookingStatus bookingStatus, List<MeetingDeviceRequestItem> devices) {
         this.title = title;
         this.description = description;
         this.startTime = startTime;
@@ -40,6 +45,7 @@ public class MeetingRequest {
         this.isAllDay = isAllDay;
         this.roomId = roomId;
         this.bookingStatus = bookingStatus;
+        this.devices = devices;
     }
     
     // Getters and Setters
@@ -97,6 +103,14 @@ public class MeetingRequest {
     
     public void setBookingStatus(BookingStatus bookingStatus) {
         this.bookingStatus = bookingStatus;
+    }
+    
+    public List<MeetingDeviceRequestItem> getDevices() {
+        return devices;
+    }
+    
+    public void setDevices(List<MeetingDeviceRequestItem> devices) {
+        this.devices = devices;
     }
 }
 

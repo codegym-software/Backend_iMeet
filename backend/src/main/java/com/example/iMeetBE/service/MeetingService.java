@@ -34,6 +34,9 @@ public class MeetingService {
     @Autowired
     private UserRepository userRepository;
     
+    @Autowired
+    private MeetingDeviceService meetingDeviceService;
+    
     // Tạo cuộc họp mới
     public ApiResponse<MeetingResponse> createMeeting(MeetingRequest request, String userId) {
         try {
@@ -96,6 +99,28 @@ public class MeetingService {
                                      request.getBookingStatus() : BookingStatus.BOOKED);
             
             Meeting savedMeeting = meetingRepository.save(meeting);
+            
+            // Xử lý mượn thiết bị nếu có
+            if (request.getDevices() != null && !request.getDevices().isEmpty()) {
+                try {
+                    for (com.example.iMeetBE.dto.MeetingDeviceRequestItem deviceItem : request.getDevices()) {
+                        // Tạo MeetingDeviceRequest cho từng thiết bị
+                        com.example.iMeetBE.dto.MeetingDeviceRequest deviceRequest = 
+                            new com.example.iMeetBE.dto.MeetingDeviceRequest();
+                        deviceRequest.setMeetingId(savedMeeting.getMeetingId());
+                        deviceRequest.setDeviceId(deviceItem.getDeviceId());
+                        deviceRequest.setQuantityBorrowed(deviceItem.getQuantityBorrowed());
+                        deviceRequest.setNotes(deviceItem.getNotes());
+                        
+                        // Mượn thiết bị
+                        meetingDeviceService.borrowDevice(deviceRequest, userId);
+                    }
+                } catch (Exception e) {
+                    // Nếu mượn thiết bị thất bại, xóa cuộc họp đã tạo
+                    meetingRepository.delete(savedMeeting);
+                    return ApiResponse.error("Lỗi khi mượn thiết bị: " + e.getMessage());
+                }
+            }
             
             return ApiResponse.success(new MeetingResponse(savedMeeting), 
                                       "Tạo cuộc họp thành công");
