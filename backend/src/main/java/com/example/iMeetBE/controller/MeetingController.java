@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.iMeetBE.dto.ApiResponse;
 import com.example.iMeetBE.dto.MeetingRequest;
+import com.example.iMeetBE.dto.InviteRequest;
+import com.example.iMeetBE.dto.InviteResponse;
 import com.example.iMeetBE.dto.MeetingResponse;
 import com.example.iMeetBE.dto.UpdateMeetingStatusRequest;
 import com.example.iMeetBE.model.BookingStatus;
@@ -76,6 +78,30 @@ public class MeetingController {
         ApiResponse<List<MeetingResponse>> response = meetingService.getAllMeetings();
         HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
         return ResponseEntity.status(status).body(response);
+    }
+
+    // Mời người tham gia bằng email
+    @PostMapping("/{meetingId}/invite")
+    public ResponseEntity<ApiResponse<java.util.List<InviteResponse>>> inviteParticipants(
+            @PathVariable Integer meetingId,
+            @Valid @RequestBody InviteRequest request,
+            Authentication authentication) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Vui lòng đăng nhập để mời người tham gia"));
+            }
+            String email = authentication.getName();
+            User inviter = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+            ApiResponse<java.util.List<InviteResponse>> response = meetingService.inviteByEmails(meetingId, request, inviter);
+            HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
+            return ResponseEntity.status(status).body(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi mời người tham gia: " + e.getMessage()));
+        }
     }
     
     // Lấy cuộc họp theo ID

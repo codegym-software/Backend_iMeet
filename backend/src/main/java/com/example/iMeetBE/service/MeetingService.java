@@ -11,14 +11,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.iMeetBE.dto.ApiResponse;
+import com.example.iMeetBE.dto.InviteRequest;
+import com.example.iMeetBE.dto.InviteResponse;
 import com.example.iMeetBE.dto.MeetingRequest;
 import com.example.iMeetBE.dto.MeetingResponse;
 import com.example.iMeetBE.model.BookingStatus;
+import com.example.iMeetBE.model.InviteRole;
+import com.example.iMeetBE.model.InviteStatus;
 import com.example.iMeetBE.model.Meeting;
+import com.example.iMeetBE.model.MeetingInvitee;
 import com.example.iMeetBE.model.Room;
 import com.example.iMeetBE.model.User;
+import com.example.iMeetBE.repository.MeetingInviteeRepository;
 import com.example.iMeetBE.repository.MeetingRepository;
 import com.example.iMeetBE.repository.RoomRepository;
+import com.example.iMeetBE.repository.UserRepository;
 
 @Service
 @Transactional
@@ -33,6 +40,15 @@ public class MeetingService {
     
     @Autowired
     private MeetingDeviceService meetingDeviceService;
+
+    @Autowired
+    private MeetingInviteeRepository meetingInviteeRepository;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private UserRepository userRepository;
     
     // Tạo cuộc họp mới
     public ApiResponse<MeetingResponse> createMeeting(MeetingRequest request, User user) {
@@ -135,6 +151,64 @@ public class MeetingService {
             return ApiResponse.error("Lỗi khi lấy danh sách cuộc họp: " + e.getMessage());
         }
     }
+
+    // Mời người dùng bằng email
+    public ApiResponse<List<InviteResponse>> inviteByEmails(Integer meetingId, InviteRequest request, User inviter) {
+        try {
+            // Tìm meeting
+            Optional<Meeting> meetingOpt = meetingRepository.findById(meetingId);
+            if (!meetingOpt.isPresent()) {
+                return ApiResponse.error("Không tìm thấy cuộc họp với ID: " + meetingId);
+            }
+            Meeting meeting = meetingOpt.get();
+            // Chỉ cho creator hoặc admin mời
+            if (!meeting.getUser().getId().equals(inviter.getId()) && inviter.getRole() != com.example.iMeetBE.model.UserRole.ADMIN) {
+                return ApiResponse.error("Bạn không có quyền mời người tham gia cho cuộc họp này");
+            }
+
+            // Duyệt emails, tạo hoặc bỏ qua nếu đã tồn tại
+            List<InviteResponse> result = new java.util.ArrayList<>();
+            for (String email : request.getEmails()) {
+                String normalized = email.trim().toLowerCase();
+                if (normalized.isEmpty()) continue;
+                // Bỏ qua nếu đã tồn tại lời mời cùng meeting+email
+                if (meetingInviteeRepository.findByMeetingAndEmail(meeting, normalized).isPresent()) {
+                    continue;
+                }
+                MeetingInvitee invitee = new MeetingInvitee();
+                invitee.setMeeting(meeting);
+                invitee.setEmail(normalized);
+                invitee.setInvitedBy(inviter);
+                invitee.setRoleInMeeting(InviteRole.PARTICIPANT);
+                invitee.setStatus(InviteStatus.PENDING);
+                // Nếu email thuộc user trong hệ thống, liên kết user vào lời mời
+                userRepository.findByEmail(normalized).ifPresent(invitee::setUser);
+                if (request.getMessage() != null) {
+                    invitee.setNotes(request.getMessage());
+                }
+                MeetingInvitee saved = meetingInviteeRepository.save(invitee);
+                result.add(new InviteResponse(saved));
+
+                // Gửi email (HTML)
+                String subject = "Lời mời tham gia cuộc họp: " + meeting.getTitle();
+                String html = emailService.buildMeetingInviteHtml(
+                    meeting.getTitle(),
+                    meeting.getDescription(),
+                    String.valueOf(meeting.getStartTime()),
+                    String.valueOf(meeting.getEndTime()),
+                    inviter.getFullName() != null ? inviter.getFullName() : inviter.getEmail(),
+                    request.getMessage()
+                );
+                emailService.sendMeetingInviteHtml(normalized, subject, html);
+            }
+
+            return ApiResponse.success(result, "Gửi lời mời thành công");
+        } catch (Exception e) {
+            return ApiResponse.error("Lỗi khi gửi lời mời: " + e.getMessage());
+        }
+    }
+
+    // Đã thay bằng email HTML trong EmailService
     
     // Lấy cuộc họp theo ID
     public ApiResponse<MeetingResponse> getMeetingById(Integer meetingId) {
