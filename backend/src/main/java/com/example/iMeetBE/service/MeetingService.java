@@ -9,6 +9,8 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.example.iMeetBE.dto.ApiResponse;
 import com.example.iMeetBE.dto.InviteRequest;
@@ -153,6 +155,7 @@ public class MeetingService {
     }
 
     // Mời người dùng bằng email
+    @Transactional(noRollbackFor = Exception.class)
     public ApiResponse<List<InviteResponse>> inviteByEmails(Integer meetingId, InviteRequest request, User inviter) {
         try {
             // Tìm meeting
@@ -168,6 +171,8 @@ public class MeetingService {
 
             // Duyệt emails, tạo hoặc bỏ qua nếu đã tồn tại
             List<InviteResponse> result = new java.util.ArrayList<>();
+            // Hàng đợi email gửi sau khi commit
+            java.util.List<java.util.AbstractMap.SimpleEntry<String, String>> emailQueue = new java.util.ArrayList<>();
             for (String email : request.getEmails()) {
                 String normalized = email.trim().toLowerCase();
                 if (normalized.isEmpty()) continue;
@@ -189,7 +194,7 @@ public class MeetingService {
                 MeetingInvitee saved = meetingInviteeRepository.save(invitee);
                 result.add(new InviteResponse(saved));
 
-                // Gửi email (HTML)
+                // Chuẩn bị email (HTML) để gửi sau commit
                 String subject = "Lời mời tham gia cuộc họp: " + meeting.getTitle();
                 String html = emailService.buildMeetingInviteHtml(
                     meeting.getTitle(),
@@ -197,9 +202,30 @@ public class MeetingService {
                     String.valueOf(meeting.getStartTime()),
                     String.valueOf(meeting.getEndTime()),
                     inviter.getFullName() != null ? inviter.getFullName() : inviter.getEmail(),
-                    request.getMessage()
+                    request.getMessage(),
+                    meeting.getRoom() != null ? meeting.getRoom().getName() : null,
+                    meeting.getRoom() != null ? meeting.getRoom().getLocation() : null
                 );
-                emailService.sendMeetingInviteHtml(normalized, subject, html);
+                emailQueue.add(new java.util.AbstractMap.SimpleEntry<>(normalized, subject + "\n\n" + html));
+            }
+
+            // Gửi email sau khi transaction commit thành công
+            if (!emailQueue.isEmpty()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        for (java.util.AbstractMap.SimpleEntry<String, String> item : emailQueue) {
+                            try {
+                                String to = item.getKey();
+                                // tách subject và html đã ghép (subject\n\nhtml)
+                                String[] parts = item.getValue().split("\\n\\n", 2);
+                                String subject = parts[0];
+                                String html = parts.length > 1 ? parts[1] : "";
+                                emailService.sendMeetingInviteHtml(to, subject, html);
+                            } catch (Exception ignore) { /* nuốt lỗi gửi mail, không ảnh hưởng DB */ }
+                        }
+                    }
+                });
             }
 
             return ApiResponse.success(result, "Gửi lời mời thành công");

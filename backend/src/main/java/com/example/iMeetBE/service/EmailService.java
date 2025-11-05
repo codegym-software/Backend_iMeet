@@ -64,9 +64,11 @@ public class EmailService {
         }
     }
 
-    public String buildMeetingInviteHtml(String title, String description, String startTime, String endTime, String inviterName, String customMessage) {
+    public String buildMeetingInviteHtml(String title, String description, String startTime, String endTime, String inviterName, String customMessage, String roomName, String roomLocation) {
         String safeDesc = description != null ? description : "";
         String safeMsg = (customMessage != null && !customMessage.isBlank()) ? customMessage : "";
+        String safeRoomName = roomName != null ? roomName : "";
+        String safeRoomLocation = roomLocation != null ? roomLocation : "";
         String logoImg = (logoUrl != null && !logoUrl.isBlank()) ?
             ("<img src=\"" + logoUrl + "\" alt=\"Logo\" style=\"height:48px; display:block; margin:0 auto 16px;\" />") : "";
 
@@ -87,6 +89,10 @@ public class EmailService {
             "<tr><td style=\"padding:24px 32px;\">" +
             (safeDesc.isBlank() ? "" : ("<p style=\"margin:0 0 12px;\"><strong>Mô tả:</strong> " + escapeHtml(safeDesc) + "</p>")) +
             "<p style=\"margin:0 0 8px;\"><strong>Thời gian:</strong> " + escapeHtml(startTime) + " - " + escapeHtml(endTime) + "</p>" +
+            (safeRoomName.isBlank() && safeRoomLocation.isBlank() ? "" : (
+                "<p style=\"margin:0 0 8px;\"><strong>Phòng:</strong> " + escapeHtml(safeRoomName) + "</p>" +
+                (safeRoomLocation.isBlank() ? "" : "<p style=\"margin:0 0 8px;\"><strong>Địa chỉ:</strong> " + escapeHtml(safeRoomLocation) + "</p>")
+            )) +
             "<p style=\"margin:0 0 16px;\"><strong>Người mời:</strong> " + escapeHtml(inviterName) + "</p>" +
             (safeMsg.isBlank() ? "" : ("<div style=\"margin:16px 0; padding:12px 16px; background:#f1f5f9; border-radius:8px; color:#0f172a;\">" +
                 "<strong>Lời nhắn:</strong><br/>" + escapeHtml(safeMsg) + "</div>")) +
