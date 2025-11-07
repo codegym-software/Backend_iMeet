@@ -141,9 +141,11 @@ public class MeetingService {
     }
     
     // Lấy tất cả cuộc họp
+    @Transactional(readOnly = true)
     public ApiResponse<List<MeetingResponse>> getAllMeetings() {
         try {
-            List<Meeting> meetings = meetingRepository.findAll();
+            // Dùng JOIN FETCH để load relationships trong cùng transaction
+            List<Meeting> meetings = meetingRepository.findAllWithRelations();
             List<MeetingResponse> responses = meetings.stream()
                 .map(MeetingResponse::new)
                 .toList();

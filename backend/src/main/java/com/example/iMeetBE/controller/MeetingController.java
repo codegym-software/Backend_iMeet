@@ -21,9 +21,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.iMeetBE.dto.ApiResponse;
-import com.example.iMeetBE.dto.MeetingRequest;
 import com.example.iMeetBE.dto.InviteRequest;
 import com.example.iMeetBE.dto.InviteResponse;
+import com.example.iMeetBE.dto.MeetingRequest;
 import com.example.iMeetBE.dto.MeetingResponse;
 import com.example.iMeetBE.dto.UpdateMeetingStatusRequest;
 import com.example.iMeetBE.model.BookingStatus;

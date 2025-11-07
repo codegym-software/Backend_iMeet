@@ -21,10 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.iMeetBE.dto.ApiResponse;
 import com.example.iMeetBE.dto.RoomRequest;
 import com.example.iMeetBE.dto.RoomResponse;
-import com.example.iMeetBE.model.Room;
-import com.example.iMeetBE.service.RoomService;
 import com.example.iMeetBE.dto.UpdateRoomStatusRequest;
+import com.example.iMeetBE.model.Room;
 import com.example.iMeetBE.model.RoomStatus;
+import com.example.iMeetBE.service.RoomService;
 
 import jakarta.validation.Valid;
 

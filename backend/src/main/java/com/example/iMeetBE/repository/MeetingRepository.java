@@ -79,5 +79,9 @@ public interface MeetingRepository extends JpaRepository<Meeting, Integer> {
     
     // Tìm các cuộc họp theo user và trạng thái
     List<Meeting> findByUserIdAndBookingStatus(String userId, BookingStatus bookingStatus);
+    
+    // Lấy tất cả cuộc họp với JOIN FETCH để load room và user
+    @Query("SELECT DISTINCT m FROM Meeting m LEFT JOIN FETCH m.room LEFT JOIN FETCH m.user")
+    List<Meeting> findAllWithRelations();
 }
 
