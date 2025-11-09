@@ -244,16 +244,11 @@ public class EmailService {
             "<h1 style=\"margin:8px 0 0; font-size:24px; line-height:1.3; font-weight:700;\">" + statusText + " thành công</h1>" +
             "</td></tr>" +
 
-            // Status badge
+            // Status badge (không có icon)
             "<tr><td style=\"padding:24px 32px 0;\">" +
             "<div style=\"padding:16px; background:" + statusBgColor + "; border-radius:8px; border-left:4px solid " + statusColor + ";\">" +
-            "<div style=\"display:flex; align-items:center; gap:12px;\">" +
-            "<div style=\"width:40px; height:40px; background:" + statusColor + "; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:20px; font-weight:bold;\">" + statusIcon + "</div>" +
-            "<div>" +
-            "<div style=\"font-size:18px; font-weight:600; color:" + statusColor + "; margin-bottom:4px;\">" + escapeHtml(safeInviteeName) + " " + statusText.toLowerCase() + " lời mời</div>" +
-            "<div style=\"font-size:14px; color:#64748b;\">" + statusMessage + "</div>" +
-            "</div>" +
-            "</div>" +
+            "<div style=\"font-size:18px; font-weight:600; color:" + statusColor + "; margin-bottom:8px;\">" + escapeHtml(safeInviteeName) + " " + statusText.toLowerCase() + " lời mời</div>" +
+            "<div style=\"font-size:14px; color:#64748b; line-height:1.5;\">" + statusMessage + "</div>" +
             "</div>" +
             "</td></tr>" +
 
@@ -261,18 +256,18 @@ public class EmailService {
             "<tr><td style=\"padding:24px 32px;\">" +
             "<p style=\"margin:0 0 16px; font-size:16px; line-height:1.6; color:#1f2937;\">" + mainMessage + "</p>" +
             
-            // Meeting info
+            // Meeting info - mỗi trường 1 dòng
             "<div style=\"background:#f8fafc; border-radius:8px; padding:20px; margin-top:16px;\">" +
             "<h3 style=\"margin:0 0 16px; font-size:18px; font-weight:600; color:#1f2937;\">" + escapeHtml(safeTitle) + "</h3>" +
-            "<div style=\"display:flex; flex-direction:column; gap:8px;\">" +
-            "<p style=\"margin:0; font-size:14px; color:#64748b;\"><strong style=\"color:#1f2937;\">Thời gian:</strong> " + escapeHtml(safeStartTime) + " - " + escapeHtml(safeEndTime) + "</p>" +
-            (safeRoomName.isBlank() ? "" : ("<p style=\"margin:0; font-size:14px; color:#64748b;\"><strong style=\"color:#1f2937;\">Phòng:</strong> " + escapeHtml(safeRoomName) + "</p>")) +
-            (safeRoomLocation.isBlank() ? "" : ("<p style=\"margin:0; font-size:14px; color:#64748b;\"><strong style=\"color:#1f2937;\">Địa chỉ:</strong> " + escapeHtml(safeRoomLocation) + "</p>")) +
-            (safeInviterName.isBlank() ? "" : ("<p style=\"margin:0; font-size:14px; color:#64748b;\"><strong style=\"color:#1f2937;\">Người mời:</strong> " + escapeHtml(safeInviterName) + "</p>")) +
-            "<p style=\"margin:0; font-size:14px; color:#64748b;\"><strong style=\"color:#1f2937;\">Trạng thái của bạn:</strong> <span style=\"color:" + statusColor + "; font-weight:600;\">" + statusText + "</span></p>" +
-            "</div>" +
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"border-collapse:collapse;\">" +
+            "<tr><td style=\"padding:8px 0; font-size:14px; color:#64748b; vertical-align:top; width:140px;\"><strong style=\"color:#1f2937;\">Thời gian:</strong></td><td style=\"padding:8px 0 8px 12px; font-size:14px; color:#64748b;\">" + escapeHtml(safeStartTime) + " - " + escapeHtml(safeEndTime) + "</td></tr>" +
+            (safeRoomName.isBlank() ? "" : ("<tr><td style=\"padding:8px 0; font-size:14px; color:#64748b; vertical-align:top; width:140px;\"><strong style=\"color:#1f2937;\">Phòng:</strong></td><td style=\"padding:8px 0 8px 12px; font-size:14px; color:#64748b;\">" + escapeHtml(safeRoomName) + "</td></tr>")) +
+            (safeRoomLocation.isBlank() ? "" : ("<tr><td style=\"padding:8px 0; font-size:14px; color:#64748b; vertical-align:top; width:140px;\"><strong style=\"color:#1f2937;\">Địa chỉ:</strong></td><td style=\"padding:8px 0 8px 12px; font-size:14px; color:#64748b;\">" + escapeHtml(safeRoomLocation) + "</td></tr>")) +
+            (safeInviterName.isBlank() ? "" : ("<tr><td style=\"padding:8px 0; font-size:14px; color:#64748b; vertical-align:top; width:140px;\"><strong style=\"color:#1f2937;\">Người mời:</strong></td><td style=\"padding:8px 0 8px 12px; font-size:14px; color:#64748b;\">" + escapeHtml(safeInviterName) + "</td></tr>")) +
+            "</table>" +
             "</div>" +
             "</td></tr>" +
+
 
             // Footer
             "<tr><td style=\"padding:16px 24px; background:#f8fafc; color:#64748b; font-size:12px; text-align:center;\">" +
