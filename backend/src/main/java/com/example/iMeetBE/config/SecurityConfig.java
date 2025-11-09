@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/check-auth", "/api/auth/change-password").permitAll()
                 .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated()
                 .requestMatchers("/api/users/profile").authenticated()
+                .requestMatchers("/api/invitations/**").permitAll() // Cho phép public endpoint để accept/decline invitation
                 .requestMatchers("/api/rooms/**").permitAll() // Cho phép test API rooms mà không cần authentication
                 .requestMatchers("/api//**").permitAll() 
                 .requestMatchers("/api/devices/**").permitAll() 

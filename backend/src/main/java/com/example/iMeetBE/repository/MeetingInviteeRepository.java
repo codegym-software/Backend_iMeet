@@ -13,6 +13,7 @@ import com.example.iMeetBE.model.MeetingInvitee;
 public interface MeetingInviteeRepository extends JpaRepository<MeetingInvitee, Integer> {
     Optional<MeetingInvitee> findByMeetingAndEmail(Meeting meeting, String email);
     List<MeetingInvitee> findByMeeting(Meeting meeting);
+    Optional<MeetingInvitee> findByToken(String token);
 }
 
 

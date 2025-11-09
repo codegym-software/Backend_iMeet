@@ -1,6 +1,7 @@
 package com.example.iMeetBE.model;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,7 +27,8 @@ import jakarta.persistence.UniqueConstraint;
     indexes = {
         @Index(name = "idx_meeting_id", columnList = "meeting_id"),
         @Index(name = "idx_email", columnList = "email"),
-        @Index(name = "idx_status", columnList = "status")
+        @Index(name = "idx_status", columnList = "status"),
+        @Index(name = "idx_token", columnList = "token")
     }
 )
 public class MeetingInvitee {
@@ -68,10 +70,16 @@ public class MeetingInvitee {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "token", nullable = false, unique = true, length = 36)
+    private String token;
+
     @PrePersist
     protected void onCreate() {
         if (this.invitedAt == null) {
             this.invitedAt = LocalDateTime.now();
+        }
+        if (this.token == null || this.token.isEmpty()) {
+            this.token = UUID.randomUUID().toString();
         }
     }
 
@@ -153,6 +161,14 @@ public class MeetingInvitee {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 }
 

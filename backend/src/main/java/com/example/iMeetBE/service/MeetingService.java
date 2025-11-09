@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -188,6 +189,8 @@ public class MeetingService {
                 invitee.setInvitedBy(inviter);
                 invitee.setRoleInMeeting(InviteRole.PARTICIPANT);
                 invitee.setStatus(InviteStatus.PENDING);
+                // Tạo token ngay để đảm bảo có sẵn
+                invitee.setToken(UUID.randomUUID().toString());
                 // Nếu email thuộc user trong hệ thống, liên kết user vào lời mời
                 userRepository.findByEmail(normalized).ifPresent(invitee::setUser);
                 if (request.getMessage() != null) {
@@ -196,7 +199,7 @@ public class MeetingService {
                 MeetingInvitee saved = meetingInviteeRepository.save(invitee);
                 result.add(new InviteResponse(saved));
 
-                // Chuẩn bị email (HTML) để gửi sau commit
+                // Chuẩn bị email (HTML) để gửi sau commit với token
                 String subject = "Lời mời tham gia cuộc họp: " + meeting.getTitle();
                 String html = emailService.buildMeetingInviteHtml(
                     meeting.getTitle(),
@@ -206,7 +209,8 @@ public class MeetingService {
                     inviter.getFullName() != null ? inviter.getFullName() : inviter.getEmail(),
                     request.getMessage(),
                     meeting.getRoom() != null ? meeting.getRoom().getName() : null,
-                    meeting.getRoom() != null ? meeting.getRoom().getLocation() : null
+                    meeting.getRoom() != null ? meeting.getRoom().getLocation() : null,
+                    saved.getToken() // Truyền token vào email
                 );
                 emailQueue.add(new java.util.AbstractMap.SimpleEntry<>(normalized, subject + "\n\n" + html));
             }
@@ -510,6 +514,134 @@ public class MeetingService {
             return ApiResponse.success(responses, "Lấy lịch phòng thành công");
         } catch (Exception e) {
             return ApiResponse.error("Lỗi khi lấy lịch phòng: " + e.getMessage());
+        }
+    }
+
+    // Xử lý chấp nhận lời mời
+    @Transactional
+    public ApiResponse<String> acceptInvitation(String token) {
+        try {
+            Optional<MeetingInvitee> inviteeOpt = meetingInviteeRepository.findByToken(token);
+            if (!inviteeOpt.isPresent()) {
+                return ApiResponse.error("Không tìm thấy lời mời với token này");
+            }
+
+            MeetingInvitee invitee = inviteeOpt.get();
+            
+            // Kiểm tra nếu đã được xử lý rồi
+            if (invitee.getStatus() != InviteStatus.PENDING) {
+                String statusMsg = invitee.getStatus() == InviteStatus.ACCEPTED ? "đã được chấp nhận" : 
+                                   invitee.getStatus() == InviteStatus.DECLINED ? "đã bị từ chối" : "đã bị hủy";
+                return ApiResponse.error("Lời mời này " + statusMsg + " trước đó");
+            }
+
+            // Cập nhật trạng thái trước
+            invitee.setStatus(InviteStatus.ACCEPTED);
+            invitee.setRespondedAt(LocalDateTime.now());
+            meetingInviteeRepository.save(invitee);
+
+            // Load meeting và inviter để lấy thông tin gửi email (sau khi save để đảm bảo trong transaction)
+            Meeting meeting = invitee.getMeeting();
+            User inviter = invitee.getInvitedBy();
+            Room room = meeting.getRoom();
+            
+            // Truy cập các field cần thiết để đảm bảo được load
+            String meetingTitle = meeting.getTitle();
+            LocalDateTime meetingStartTime = meeting.getStartTime();
+            LocalDateTime meetingEndTime = meeting.getEndTime();
+            String inviteeEmail = invitee.getEmail();
+            String inviteeName = invitee.getUser() != null && invitee.getUser().getFullName() != null 
+                ? invitee.getUser().getFullName() 
+                : inviteeEmail;
+            String inviterName = inviter.getFullName() != null ? inviter.getFullName() : inviter.getEmail();
+            String roomName = room != null ? room.getName() : null;
+            String roomLocation = room != null ? room.getLocation() : null;
+
+            // Gửi email xác nhận cho người được mời (bất đồng bộ, không ảnh hưởng đến response)
+            try {
+                emailService.sendInvitationResponseConfirmation(
+                    inviteeEmail,
+                    inviteeName,
+                    meetingTitle,
+                    String.valueOf(meetingStartTime),
+                    String.valueOf(meetingEndTime),
+                    roomName,
+                    roomLocation,
+                    inviterName,
+                    true // isAccepted = true
+                );
+            } catch (Exception emailException) {
+                // Log lỗi nhưng không ảnh hưởng đến kết quả
+                System.err.println("Lỗi khi gửi email xác nhận: " + emailException.getMessage());
+            }
+
+            return ApiResponse.success("Đã chấp nhận lời mời thành công", "Bạn đã chấp nhận lời mời tham gia cuộc họp");
+        } catch (Exception e) {
+            return ApiResponse.error("Lỗi khi chấp nhận lời mời: " + e.getMessage());
+        }
+    }
+
+    // Xử lý từ chối lời mời
+    @Transactional
+    public ApiResponse<String> declineInvitation(String token) {
+        try {
+            Optional<MeetingInvitee> inviteeOpt = meetingInviteeRepository.findByToken(token);
+            if (!inviteeOpt.isPresent()) {
+                return ApiResponse.error("Không tìm thấy lời mời với token này");
+            }
+
+            MeetingInvitee invitee = inviteeOpt.get();
+            
+            // Kiểm tra nếu đã được xử lý rồi
+            if (invitee.getStatus() != InviteStatus.PENDING) {
+                String statusMsg = invitee.getStatus() == InviteStatus.ACCEPTED ? "đã được chấp nhận" : 
+                                   invitee.getStatus() == InviteStatus.DECLINED ? "đã bị từ chối" : "đã bị hủy";
+                return ApiResponse.error("Lời mời này " + statusMsg + " trước đó");
+            }
+
+            // Cập nhật trạng thái trước
+            invitee.setStatus(InviteStatus.DECLINED);
+            invitee.setRespondedAt(LocalDateTime.now());
+            meetingInviteeRepository.save(invitee);
+
+            // Load meeting và inviter để lấy thông tin gửi email (sau khi save để đảm bảo trong transaction)
+            Meeting meeting = invitee.getMeeting();
+            User inviter = invitee.getInvitedBy();
+            Room room = meeting.getRoom();
+            
+            // Truy cập các field cần thiết để đảm bảo được load
+            String meetingTitle = meeting.getTitle();
+            LocalDateTime meetingStartTime = meeting.getStartTime();
+            LocalDateTime meetingEndTime = meeting.getEndTime();
+            String inviteeEmail = invitee.getEmail();
+            String inviteeName = invitee.getUser() != null && invitee.getUser().getFullName() != null 
+                ? invitee.getUser().getFullName() 
+                : inviteeEmail;
+            String inviterName = inviter.getFullName() != null ? inviter.getFullName() : inviter.getEmail();
+            String roomName = room != null ? room.getName() : null;
+            String roomLocation = room != null ? room.getLocation() : null;
+
+            // Gửi email xác nhận cho người được mời (bất đồng bộ, không ảnh hưởng đến response)
+            try {
+                emailService.sendInvitationResponseConfirmation(
+                    inviteeEmail,
+                    inviteeName,
+                    meetingTitle,
+                    String.valueOf(meetingStartTime),
+                    String.valueOf(meetingEndTime),
+                    roomName,
+                    roomLocation,
+                    inviterName,
+                    false // isAccepted = false
+                );
+            } catch (Exception emailException) {
+                // Log lỗi nhưng không ảnh hưởng đến kết quả
+                System.err.println("Lỗi khi gửi email xác nhận: " + emailException.getMessage());
+            }
+
+            return ApiResponse.success("Đã từ chối lời mời thành công", "Bạn đã từ chối lời mời tham gia cuộc họp");
+        } catch (Exception e) {
+            return ApiResponse.error("Lỗi khi từ chối lời mời: " + e.getMessage());
         }
     }
 }
