@@ -2,10 +2,12 @@ package com.example.iMeetBE.controller;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -97,6 +99,26 @@ public class RoomController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Lỗi khi lấy danh sách phòng có sẵn: " + e.getMessage()));
+        }
+    }
+
+    // Lấy phòng trống theo khoảng thời gian
+    @GetMapping("/available-in-range")
+    public ResponseEntity<ApiResponse<List<RoomResponse>>> getAvailableRoomsInRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
+        try {
+            if (!endTime.isAfter(startTime)) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("endTime phải sau startTime"));
+            }
+            List<Room> rooms = roomService.getAvailableRoomsInRange(startTime, endTime);
+            List<RoomResponse> roomResponses = rooms.stream()
+                .map(RoomResponse::new)
+                .toList();
+            return ResponseEntity.ok(ApiResponse.success(roomResponses, "Lấy danh sách phòng trống theo khoảng thời gian thành công"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi lấy phòng trống theo khoảng thời gian: " + e.getMessage()));
         }
     }
     

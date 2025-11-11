@@ -1,5 +1,6 @@
 package com.example.iMeetBE.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,4 +42,18 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
     boolean existsByName(String name);
     
     Optional<Room> findByName(String name);
+
+    // Tìm các phòng trống trong khoảng thời gian: không có meeting nào overlap [start, end]
+    @Query("""
+        SELECT r FROM Room r
+        WHERE NOT EXISTS (
+          SELECT m FROM Meeting m
+          WHERE m.room = r
+            AND m.bookingStatus <> 'CANCELLED'
+            AND m.startTime < :end
+            AND m.endTime > :start
+        )
+        ORDER BY r.name ASC
+    """)
+    List<Room> findAvailableInRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
