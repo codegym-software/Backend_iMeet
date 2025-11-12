@@ -25,6 +25,9 @@ public class EmailService {
     @Value("${app.api.base-url:http://localhost:8081}")
     private String apiBaseUrl; // Base URL của backend API
     
+    @Value("${app.frontend.base-url:http://localhost:3000}")
+    private String frontendBaseUrl; // Base URL của frontend
+    
     public void sendVerificationCode(String toEmail, String code) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -95,21 +98,28 @@ public class EmailService {
             "</td></tr>" +
 
             "<tr><td style=\"padding:24px 32px;\">" +
-            (safeDesc.isBlank() ? "" : ("<p style=\"margin:0 0 12px;\"><strong>Mô tả:</strong> " + escapeHtml(safeDesc) + "</p>")) +
-            "<p style=\"margin:0 0 8px;\"><strong>Thời gian:</strong> " + escapeHtml(startTime) + " - " + escapeHtml(endTime) + "</p>" +
+            (safeDesc.isBlank() ? "" : ("<p style=\"margin:0 0 4px; line-height:1.5;\"><strong>Mô tả:</strong> " + escapeHtml(safeDesc) + "</p>")) +
+            "<p style=\"margin:0 0 4px; line-height:1.5;\"><strong>Thời gian:</strong> " + escapeHtml(startTime) + " - " + escapeHtml(endTime) + "</p>" +
             (safeRoomName.isBlank() && safeRoomLocation.isBlank() ? "" : (
-                "<p style=\"margin:0 0 8px;\"><strong>Phòng:</strong> " + escapeHtml(safeRoomName) + "</p>" +
-                (safeRoomLocation.isBlank() ? "" : "<p style=\"margin:0 0 8px;\"><strong>Địa chỉ:</strong> " + escapeHtml(safeRoomLocation) + "</p>")
+                "<p style=\"margin:0 0 4px; line-height:1.5;\"><strong>Phòng:</strong> " + escapeHtml(safeRoomName) + "</p>" +
+                (safeRoomLocation.isBlank() ? "" : "<p style=\"margin:0 0 4px; line-height:1.5;\"><strong>Địa chỉ:</strong> " + escapeHtml(safeRoomLocation) + "</p>")
             )) +
-            "<p style=\"margin:0 0 16px;\"><strong>Người mời:</strong> " + escapeHtml(inviterName) + "</p>" +
+            "<p style=\"margin:0 0 16px; line-height:1.5;\"><strong>Người mời:</strong> " + escapeHtml(inviterName) + "</p>" +
             (safeMsg.isBlank() ? "" : ("<div style=\"margin:16px 0; padding:12px 16px; background:#f1f5f9; border-radius:8px; color:#0f172a;\">" +
                 "<strong>Lời nhắn:</strong><br/>" + escapeHtml(safeMsg) + "</div>")) +
             "<div style=\"margin-top:32px; text-align:center;\">" +
-            "<p style=\"margin:0 0 16px; font-size:16px; font-weight:600; color:#1f2937;\">Bạn có muốn tham gia cuộc họp này không?</p>" +
-            "<div style=\"display:flex; gap:12px; justify-content:center; flex-wrap:wrap;\">" +
-            "<a href=\"" + acceptUrl + "\" style=\"display:inline-block; padding:14px 28px; background:#10b981; color:#fff; text-decoration:none; border-radius:8px; font-weight:600; font-size:16px; min-width:120px;\">Đồng ý</a>" +
-            "<a href=\"" + declineUrl + "\" style=\"display:inline-block; padding:14px 28px; background:#ef4444; color:#fff; text-decoration:none; border-radius:8px; font-weight:600; font-size:16px; min-width:120px;\">Từ chối</a>" +
-            "</div>" +
+            "<p style=\"margin:0 0 16px; font-size:16px; font-weight:600; color:#1f2937; line-height:1.6;\">Bạn có muốn tham gia cuộc họp này không?</p>" +
+            // Dùng bảng 2 cột để canh đều 2 nút trong email client
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"margin:0; padding:0;\">" +
+            "<tr>" +
+            "<td align=\"center\" valign=\"middle\" width=\"50%\" style=\"padding:0 6px;\">" +
+            "<a href=\"" + acceptUrl + "\" style=\"display:block; text-align:center; padding:14px 0; background:#3b82f6; color:#fff; text-decoration:none; border-radius:8px; font-weight:600; font-size:16px; width:100%;\">Đồng ý</a>" +
+            "</td>" +
+            "<td align=\"center\" valign=\"middle\" width=\"50%\" style=\"padding:0 6px;\">" +
+            "<a href=\"" + declineUrl + "\" style=\"display:block; text-align:center; padding:14px 0; background:#6b7280; color:#fff; text-decoration:none; border-radius:8px; font-weight:600; font-size:16px; width:100%;\">Từ chối</a>" +
+            "</td>" +
+            "</tr>" +
+            "</table>" +
             "</div>" +
             "</td></tr>" +
 
@@ -150,7 +160,7 @@ public class EmailService {
     }
 
     /**
-     * Gửi email xác nhận kết quả phản hồi lời mời cho người được mời
+     * Gửi email xác nhận kết quả phản hồi lời mời cho người được mời (dạng text)
      * @param inviteeEmail Email của người được mời
      * @param inviteeName Tên của người được mời (có thể là email nếu không có tên)
      * @param meetingTitle Tiêu đề cuộc họp
@@ -176,7 +186,7 @@ public class EmailService {
                 ? "Xác nhận: Bạn đã chấp nhận lời mời tham gia cuộc họp - " + meetingTitle
                 : "Xác nhận: Bạn đã từ chối lời mời tham gia cuộc họp - " + meetingTitle;
             
-            String htmlContent = buildInvitationResponseConfirmationHtml(
+            String textContent = buildInvitationResponseConfirmationText(
                 inviteeName,
                 meetingTitle,
                 meetingStartTime,
@@ -187,11 +197,82 @@ public class EmailService {
                 isAccepted
             );
             
-            sendMeetingInviteHtml(inviteeEmail, subject, htmlContent);
+            sendMeetingInvite(inviteeEmail, subject, textContent);
         } catch (Exception e) {
             // Log lỗi nhưng không throw exception để không ảnh hưởng đến việc cập nhật status
             System.err.println("Không thể gửi email xác nhận: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Tạo nội dung email xác nhận phản hồi lời mời dạng text với link frontend
+     */
+    private String buildInvitationResponseConfirmationText(
+            String inviteeName,
+            String meetingTitle,
+            String meetingStartTime,
+            String meetingEndTime,
+            String roomName,
+            String roomLocation,
+            String inviterName,
+            boolean isAccepted) {
+        
+        StringBuilder content = new StringBuilder();
+        
+        String safeTitle = meetingTitle != null ? meetingTitle : "";
+        String safeStartTime = meetingStartTime != null ? meetingStartTime : "";
+        String safeEndTime = meetingEndTime != null ? meetingEndTime : "";
+        String safeRoomName = roomName != null ? roomName : "";
+        String safeRoomLocation = roomLocation != null ? roomLocation : "";
+        String safeInviterName = inviterName != null ? inviterName : "";
+        
+        String statusText = isAccepted ? "Đã chấp nhận" : "Đã từ chối";
+        String statusMessage = isAccepted 
+            ? "Cảm ơn bạn đã chấp nhận lời mời. Chúng tôi sẽ thông báo cho người mời về quyết định của bạn."
+            : "Bạn đã từ chối lời mời tham gia cuộc họp. Người mời đã được thông báo về quyết định của bạn.";
+        String mainMessage = isAccepted
+            ? "Bạn đã xác nhận tham gia cuộc họp này. Vui lòng sắp xếp thời gian và tham gia đúng giờ."
+            : "Bạn đã từ chối lời mời tham gia cuộc họp này.";
+        
+        content.append("XÁC NHẬN PHẢN HỒI LỜI MỜI\n");
+        content.append("========================\n\n");
+        
+        content.append(statusText).append(" thành công\n\n");
+        
+        content.append(statusMessage).append("\n\n");
+        
+        content.append(mainMessage).append("\n\n");
+        
+        content.append("THÔNG TIN CUỘC HỌP\n");
+        content.append("-------------------\n\n");
+        
+        content.append("Tiêu đề: ").append(safeTitle).append("\n");
+        content.append("Thời gian: ").append(safeStartTime).append(" - ").append(safeEndTime).append("\n");
+        
+        if (!safeRoomName.isBlank()) {
+            content.append("Phòng: ").append(safeRoomName).append("\n");
+        }
+        
+        if (!safeRoomLocation.isBlank()) {
+            content.append("Địa chỉ: ").append(safeRoomLocation).append("\n");
+        }
+        
+        if (!safeInviterName.isBlank()) {
+            content.append("Người mời: ").append(safeInviterName).append("\n");
+        }
+        
+        // Chỉ thêm link frontend nếu đồng ý tham gia
+        if (isAccepted) {
+            content.append("\n");
+            content.append("Bạn có thể xem tất cả các cuộc họp mà mình tham gia tại:\n");
+            String myMeetingsUrl = frontendBaseUrl + "/my-meetings";
+            content.append(myMeetingsUrl).append("\n\n");
+        }
+        
+        content.append("---\n");
+        content.append("Email được gửi từ hệ thống ").append(displayName != null ? displayName : "iMeet").append(".\n");
+        
+        return content.toString();
     }
 
     /**
