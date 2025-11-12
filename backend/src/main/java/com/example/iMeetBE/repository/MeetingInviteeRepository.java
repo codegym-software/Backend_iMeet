@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.example.iMeetBE.model.Meeting;
@@ -14,6 +16,10 @@ public interface MeetingInviteeRepository extends JpaRepository<MeetingInvitee, 
     Optional<MeetingInvitee> findByMeetingAndEmail(Meeting meeting, String email);
     List<MeetingInvitee> findByMeeting(Meeting meeting);
     Optional<MeetingInvitee> findByToken(String token);
+    
+    // Đếm số người được mời cho một cuộc họp
+    @Query("SELECT COUNT(mi) FROM MeetingInvitee mi WHERE mi.meeting.meetingId = :meetingId")
+    Long countParticipantsByMeetingId(@Param("meetingId") Integer meetingId);
 }
 
 

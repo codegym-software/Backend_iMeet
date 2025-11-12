@@ -53,6 +53,31 @@ public class MeetingService {
     @Autowired
     private UserRepository userRepository;
     
+    // Helper method để tạo MeetingResponse từ Meeting với số participants
+    private MeetingResponse toMeetingResponse(Meeting meeting) {
+        MeetingResponse response = new MeetingResponse(meeting);
+        // Sử dụng giá trị từ database, nếu null thì tính lại và cập nhật
+        Long participantCount = meeting.getParticipants();
+        if (participantCount == null) {
+            participantCount = meetingInviteeRepository.countParticipantsByMeetingId(meeting.getMeetingId());
+            participantCount = participantCount != null ? participantCount : 0L;
+            meeting.setParticipants(participantCount);
+            meetingRepository.save(meeting);
+        }
+        response.setParticipants(participantCount);
+        return response;
+    }
+    
+    // Helper method để cập nhật số participants trong database
+    private void updateParticipantsCount(Integer meetingId) {
+        Long count = meetingInviteeRepository.countParticipantsByMeetingId(meetingId);
+        final Long finalCount = count != null ? count : 0L;
+        meetingRepository.findById(meetingId).ifPresent(meeting -> {
+            meeting.setParticipants(finalCount);
+            meetingRepository.save(meeting);
+        });
+    }
+    
     // Tạo cuộc họp mới
     public ApiResponse<MeetingResponse> createMeeting(MeetingRequest request, User user) {
         try {
@@ -109,6 +134,7 @@ public class MeetingService {
             meeting.setUser(user);
             meeting.setBookingStatus(request.getBookingStatus() != null ? 
                                      request.getBookingStatus() : BookingStatus.BOOKED);
+            meeting.setParticipants(0L); // Khởi tạo số participants = 0
             
             Meeting savedMeeting = meetingRepository.save(meeting);
             
@@ -134,7 +160,7 @@ public class MeetingService {
                 }
             }
             
-            return ApiResponse.success(new MeetingResponse(savedMeeting), 
+            return ApiResponse.success(toMeetingResponse(savedMeeting), 
                                       "Tạo cuộc họp thành công");
         } catch (Exception e) {
             return ApiResponse.error("Lỗi khi tạo cuộc họp: " + e.getMessage());
@@ -148,7 +174,7 @@ public class MeetingService {
             // Dùng JOIN FETCH để load relationships trong cùng transaction
             List<Meeting> meetings = meetingRepository.findAllWithRelations();
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Lấy danh sách cuộc họp thành công");
@@ -215,6 +241,11 @@ public class MeetingService {
                 emailQueue.add(new java.util.AbstractMap.SimpleEntry<>(normalized, subject + "\n\n" + html));
             }
 
+            // Cập nhật số participants trong database
+            if (!result.isEmpty()) {
+                updateParticipantsCount(meetingId);
+            }
+
             // Gửi email sau khi transaction commit thành công
             if (!emailQueue.isEmpty()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -247,7 +278,7 @@ public class MeetingService {
         try {
             Optional<Meeting> meetingOpt = meetingRepository.findById(meetingId);
             if (meetingOpt.isPresent()) {
-                return ApiResponse.success(new MeetingResponse(meetingOpt.get()), 
+                return ApiResponse.success(toMeetingResponse(meetingOpt.get()), 
                                           "Lấy thông tin cuộc họp thành công");
             } else {
                 return ApiResponse.error("Không tìm thấy cuộc họp với ID: " + meetingId);
@@ -331,7 +362,7 @@ public class MeetingService {
             
             Meeting updatedMeeting = meetingRepository.save(meeting);
             
-            return ApiResponse.success(new MeetingResponse(updatedMeeting), 
+            return ApiResponse.success(toMeetingResponse(updatedMeeting), 
                                       "Cập nhật cuộc họp thành công");
         } catch (Exception e) {
             return ApiResponse.error("Lỗi khi cập nhật cuộc họp: " + e.getMessage());
@@ -386,7 +417,7 @@ public class MeetingService {
             meeting.setBookingStatus(status);
             Meeting updatedMeeting = meetingRepository.save(meeting);
             
-            return ApiResponse.success(new MeetingResponse(updatedMeeting), 
+            return ApiResponse.success(toMeetingResponse(updatedMeeting), 
                                       "Cập nhật trạng thái cuộc họp thành công");
         } catch (Exception e) {
             return ApiResponse.error("Lỗi khi cập nhật trạng thái cuộc họp: " + e.getMessage());
@@ -398,7 +429,7 @@ public class MeetingService {
         try {
             List<Meeting> meetings = meetingRepository.findByRoomRoomId(roomId);
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Lấy danh sách cuộc họp theo phòng thành công");
@@ -412,7 +443,7 @@ public class MeetingService {
         try {
             List<Meeting> meetings = meetingRepository.findByUserId(userId);
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Lấy danh sách cuộc họp theo người dùng thành công");
@@ -426,7 +457,7 @@ public class MeetingService {
         try {
             List<Meeting> meetings = meetingRepository.findByBookingStatus(status);
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Lấy danh sách cuộc họp theo trạng thái thành công");
@@ -440,7 +471,7 @@ public class MeetingService {
         try {
             List<Meeting> meetings = meetingRepository.findByDateRange(startTime, endTime);
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Lấy danh sách cuộc họp theo khoảng thời gian thành công");
@@ -454,7 +485,7 @@ public class MeetingService {
         try {
             List<Meeting> meetings = meetingRepository.findUpcomingMeetings(LocalDateTime.now());
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Lấy danh sách cuộc họp sắp tới thành công");
@@ -469,7 +500,7 @@ public class MeetingService {
             LocalDateTime today = LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
             List<Meeting> meetings = meetingRepository.findMeetingsByDate(today);
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Lấy danh sách cuộc họp hôm nay thành công");
@@ -483,7 +514,7 @@ public class MeetingService {
         try {
             List<Meeting> meetings = meetingRepository.findByTitleContainingIgnoreCase(title);
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Tìm kiếm cuộc họp thành công");
@@ -508,7 +539,7 @@ public class MeetingService {
         try {
             List<Meeting> meetings = meetingRepository.findByRoomAndTimeRange(roomId, startTime, endTime);
             List<MeetingResponse> responses = meetings.stream()
-                .map(MeetingResponse::new)
+                .map(this::toMeetingResponse)
                 .toList();
             
             return ApiResponse.success(responses, "Lấy lịch phòng thành công");
