@@ -178,7 +178,7 @@ public class OAuth2Controller {
             "client_id=%s&" +
             "logout_uri=%s",
             clientId,
-            "http://localhost:3000/login,http://localhost:3001/login"
+            "https://imeettt.netlify.app/login,http://localhost:3000/login,http://localhost:3001/login"
         );
         
         return Map.of(
@@ -240,7 +240,7 @@ public class OAuth2Controller {
             body.add("grant_type", "authorization_code");
             body.add("client_id", clientId);
             body.add("code", authorizationCode);
-            body.add("redirect_uri", "http://localhost:3000/oauth2/callback,http://localhost:3001/oauth2/callback");
+            body.add("redirect_uri", "https://imeettt.netlify.app/oauth2/callback,http://localhost:3000/oauth2/callback,http://localhost:3001/oauth2/callback");
 
             // Chuẩn bị headers với Basic Authentication
             HttpHeaders headers = new HttpHeaders();

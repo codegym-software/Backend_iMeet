@@ -22,6 +22,7 @@ public class MeetingResponse {
     private BookingStatus bookingStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long participants; // Số người được mời
     
     // Constructors
     public MeetingResponse() {}
@@ -172,6 +173,14 @@ public class MeetingResponse {
     
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    public Long getParticipants() {
+        return participants;
+    }
+    
+    public void setParticipants(Long participants) {
+        this.participants = participants;
     }
 }
 

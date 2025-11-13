@@ -2,6 +2,7 @@ package com.example.iMeetBE.service;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,10 @@ public class RoomService {
     
     public List<Room> getAvailableRooms() {
         return roomRepository.findByStatusOrderByName(RoomStatus.AVAILABLE);
+    }
+
+    public List<Room> getAvailableRoomsInRange(LocalDateTime startTime, LocalDateTime endTime) {
+        return roomRepository.findAvailableInRange(startTime, endTime);
     }
     
     public List<Room> getRoomsByCapacity(Integer minCapacity) {

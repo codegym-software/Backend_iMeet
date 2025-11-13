@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/check-auth", "/api/auth/change-password").permitAll()
                 .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated()
                 .requestMatchers("/api/users/profile").authenticated()
+                .requestMatchers("/api/invitations/**").permitAll() // Cho phép public endpoint để accept/decline invitation
                 .requestMatchers("/api/rooms/**").permitAll() // Cho phép test API rooms mà không cần authentication
                 .requestMatchers("/api//**").permitAll() 
                 .requestMatchers("/api/devices/**").permitAll() 
@@ -93,7 +94,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler() {
         SimpleUrlAuthenticationSuccessHandler handler = new SimpleUrlAuthenticationSuccessHandler();
-        handler.setDefaultTargetUrl("http://localhost:3000/oauth2/callback,http://localhost:3001/oauth2/callback"); // Always redirect to callback (default to 3000)
+        handler.setDefaultTargetUrl("https://imeettt.netlify.app/oauth2/callback,http://localhost:3000/oauth2/callback,http://localhost:3001/oauth2/callback"); // Always redirect to callback
         handler.setAlwaysUseDefaultTargetUrl(true);
         return handler;
     }

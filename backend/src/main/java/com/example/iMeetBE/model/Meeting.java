@@ -58,6 +58,9 @@ public class Meeting {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
+    @Column(name = "participants")
+    private Long participants = 0L; // Số người được mời
+    
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -170,6 +173,14 @@ public class Meeting {
     
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    public Long getParticipants() {
+        return participants;
+    }
+    
+    public void setParticipants(Long participants) {
+        this.participants = participants;
     }
 }
 
