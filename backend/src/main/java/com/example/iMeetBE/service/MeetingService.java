@@ -53,6 +53,34 @@ public class MeetingService {
     @Autowired
     private UserRepository userRepository;
     
+    @Transactional(readOnly = true)
+    public ApiResponse<List<MeetingResponse>> getMeetingsForInviteeToken(String token) {
+        try {
+            Optional<MeetingInvitee> inviteeOpt = meetingInviteeRepository.findByToken(token);
+            if (!inviteeOpt.isPresent()) {
+                return ApiResponse.error("Token không hợp lệ hoặc không tồn tại");
+            }
+            MeetingInvitee invitee = inviteeOpt.get();
+            
+            if (invitee.getStatus() != InviteStatus.ACCEPTED) {
+                return ApiResponse.error("Bạn cần chấp nhận lời mời trước khi xem danh sách cuộc họp");
+            }
+            
+            List<MeetingInvitee> acceptedInvites = meetingInviteeRepository
+                .findByEmailAndStatusWithMeeting(invitee.getEmail(), InviteStatus.ACCEPTED);
+            
+            List<MeetingResponse> meetings = acceptedInvites.stream()
+                .map(MeetingInvitee::getMeeting)
+                .distinct()
+                .map(this::toMeetingResponse)
+                .toList();
+            
+            return ApiResponse.success(meetings, "Lấy danh sách cuộc họp thành công");
+        } catch (Exception e) {
+            return ApiResponse.error("Lỗi khi lấy danh sách cuộc họp: " + e.getMessage());
+        }
+    }
+    
     // Helper method để tạo MeetingResponse từ Meeting với số participants
     private MeetingResponse toMeetingResponse(Meeting meeting) {
         MeetingResponse response = new MeetingResponse(meeting);
@@ -599,7 +627,8 @@ public class MeetingService {
                     roomName,
                     roomLocation,
                     inviterName,
-                    true // isAccepted = true
+                    true, // isAccepted = true
+                    token
                 );
             } catch (Exception emailException) {
                 // Log lỗi nhưng không ảnh hưởng đến kết quả
@@ -663,7 +692,8 @@ public class MeetingService {
                     roomName,
                     roomLocation,
                     inviterName,
-                    false // isAccepted = false
+                    false, // isAccepted = false
+                    null
                 );
             } catch (Exception emailException) {
                 // Log lỗi nhưng không ảnh hưởng đến kết quả

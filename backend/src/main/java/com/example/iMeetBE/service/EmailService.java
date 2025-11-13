@@ -180,7 +180,8 @@ public class EmailService {
             String roomName,
             String roomLocation,
             String inviterName,
-            boolean isAccepted) {
+            boolean isAccepted,
+            String viewToken) {
         try {
             String subject = isAccepted 
                 ? "Xác nhận: Bạn đã chấp nhận lời mời tham gia cuộc họp - " + meetingTitle
@@ -194,7 +195,8 @@ public class EmailService {
                 roomName,
                 roomLocation,
                 inviterName,
-                isAccepted
+                isAccepted,
+                viewToken
             );
             
             sendMeetingInvite(inviteeEmail, subject, textContent);
@@ -215,7 +217,8 @@ public class EmailService {
             String roomName,
             String roomLocation,
             String inviterName,
-            boolean isAccepted) {
+            boolean isAccepted,
+            String viewToken) {
         
         StringBuilder content = new StringBuilder();
         
@@ -267,6 +270,12 @@ public class EmailService {
             content.append("Bạn có thể xem tất cả các cuộc họp mà mình tham gia tại:\n");
             String myMeetingsUrl = frontendBaseUrl + "/my-meetings";
             content.append(myMeetingsUrl).append("\n\n");
+            
+            if (viewToken != null && !viewToken.isBlank()) {
+                String meetingDetailUrl = frontendBaseUrl + "/my-meetings/view?token=" + viewToken;
+                content.append("Xem chi tiết cuộc họp này:\n");
+                content.append(meetingDetailUrl).append("\n\n");
+            }
         }
         
         content.append("---\n");

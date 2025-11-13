@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.example.iMeetBE.model.InviteStatus;
 import com.example.iMeetBE.model.Meeting;
 import com.example.iMeetBE.model.MeetingInvitee;
 
@@ -20,6 +21,18 @@ public interface MeetingInviteeRepository extends JpaRepository<MeetingInvitee, 
     // Đếm số người được mời cho một cuộc họp
     @Query("SELECT COUNT(mi) FROM MeetingInvitee mi WHERE mi.meeting.meetingId = :meetingId")
     Long countParticipantsByMeetingId(@Param("meetingId") Integer meetingId);
+    
+    @Query("""
+        SELECT mi FROM MeetingInvitee mi
+        JOIN FETCH mi.meeting m
+        LEFT JOIN FETCH m.room
+        LEFT JOIN FETCH m.user
+        WHERE mi.email = :email AND mi.status = :status
+        """)
+    List<MeetingInvitee> findByEmailAndStatusWithMeeting(
+        @Param("email") String email,
+        @Param("status") InviteStatus status
+    );
 }
 
 

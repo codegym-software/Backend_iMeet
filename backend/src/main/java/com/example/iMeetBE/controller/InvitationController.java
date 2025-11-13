@@ -1,5 +1,7 @@
 package com.example.iMeetBE.controller;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.iMeetBE.dto.ApiResponse;
+import com.example.iMeetBE.dto.MeetingResponse;
 import com.example.iMeetBE.service.MeetingService;
 
 @RestController
@@ -89,6 +92,18 @@ public class InvitationController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Lỗi khi từ chối lời mời: " + e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/{token}/meetings")
+    public ResponseEntity<ApiResponse<List<MeetingResponse>>> getMeetingsForInvitee(@PathVariable String token) {
+        try {
+            ApiResponse<List<MeetingResponse>> response = meetingService.getMeetingsForInviteeToken(token);
+            HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
+            return ResponseEntity.status(status).body(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi lấy danh sách cuộc họp: " + e.getMessage()));
         }
     }
     
