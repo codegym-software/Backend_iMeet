@@ -25,7 +25,7 @@ public class EmailService {
     @Value("${app.api.base-url:http://localhost:8081}")
     private String apiBaseUrl; // Base URL của backend API
     
-    @Value("${app.frontend.base-url:http://localhost:3000}")
+    @Value("${app.frontend.base-url:https://imeeet.netlify.app}")
     private String frontendBaseUrl; // Base URL của frontend
     
     public void sendVerificationCode(String toEmail, String code) {

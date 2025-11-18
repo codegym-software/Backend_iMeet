@@ -16,7 +16,7 @@ import com.amazonaws.services.cognitoidp.model.ListUsersResult;
 
 @RestController
 @RequestMapping("/api/aws")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "https://imeeet.netlify.app"}, allowCredentials = "true")
 public class AwsTestController {
 
     @Autowired

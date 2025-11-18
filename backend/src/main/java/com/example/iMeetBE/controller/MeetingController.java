@@ -35,7 +35,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/meetings")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "https://imeeet.netlify.app"}, allowCredentials = "true")
 public class MeetingController {
     
     @Autowired
@@ -207,6 +207,33 @@ public class MeetingController {
         ApiResponse<List<MeetingResponse>> response = meetingService.getMeetingsByRoom(roomId);
         HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
         return ResponseEntity.status(status).body(response);
+    }
+    
+    // Lấy cuộc họp của user hiện tại
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<MeetingResponse>>> getMyMeetings(Authentication authentication) {
+        try {
+            // Kiểm tra authentication
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Vui lòng đăng nhập để xem cuộc họp của bạn"));
+            }
+            
+            // Lấy email từ authentication
+            String email = authentication.getName();
+            
+            // Tìm user theo email
+            User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
+            
+            // Lấy cuộc họp của user
+            ApiResponse<List<MeetingResponse>> response = meetingService.getMeetingsByUser(user.getId());
+            HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
+            return ResponseEntity.status(status).body(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi lấy danh sách cuộc họp: " + e.getMessage()));
+        }
     }
     
     // Lấy cuộc họp theo người dùng

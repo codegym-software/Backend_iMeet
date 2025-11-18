@@ -15,7 +15,7 @@ public class CorsConfig {
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
                         // ✅ Cho phép origin frontend (port 3000 và 3001)
-                        .allowedOriginPatterns("http://localhost:3000", "http://localhost:3001") 
+                        .allowedOriginPatterns("http://localhost:3000", "http://localhost:3001", "https://imeeet.netlify.app") 
                         // ✅ Nếu sau này bạn deploy, thêm vào như sau:
                         // .allowedOriginPatterns("http://localhost:3000", "http://localhost:3001", "https://your-domain.com")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")

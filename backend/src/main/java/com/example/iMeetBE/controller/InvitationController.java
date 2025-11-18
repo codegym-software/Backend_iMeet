@@ -19,7 +19,7 @@ import com.example.iMeetBE.service.MeetingService;
 
 @RestController
 @RequestMapping("/api/invitations")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "https://imeettt.netlify.app"}, allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "https://imeeet.netlify.app"}, allowCredentials = "true")
 public class InvitationController {
     
     @Autowired
