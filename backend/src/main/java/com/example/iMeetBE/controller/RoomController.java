@@ -106,12 +106,13 @@ public class RoomController {
     @GetMapping("/available-in-range")
     public ResponseEntity<ApiResponse<List<RoomResponse>>> getAvailableRoomsInRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
+            @RequestParam(required = false) Integer minCapacity) {
         try {
             if (!endTime.isAfter(startTime)) {
                 return ResponseEntity.badRequest().body(ApiResponse.error("endTime phải sau startTime"));
             }
-            List<Room> rooms = roomService.getAvailableRoomsInRange(startTime, endTime);
+            List<Room> rooms = roomService.getAvailableRoomsInRange(startTime, endTime, minCapacity);
             List<RoomResponse> roomResponses = rooms.stream()
                 .map(RoomResponse::new)
                 .toList();

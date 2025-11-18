@@ -36,8 +36,11 @@ public class RoomService {
         return roomRepository.findByStatusOrderByName(RoomStatus.AVAILABLE);
     }
 
-    public List<Room> getAvailableRoomsInRange(LocalDateTime startTime, LocalDateTime endTime) {
-        return roomRepository.findAvailableInRange(startTime, endTime);
+    public List<Room> getAvailableRoomsInRange(LocalDateTime startTime, LocalDateTime endTime, Integer minCapacity) {
+        if (minCapacity == null) {
+            return roomRepository.findAvailableInRange(startTime, endTime);
+        }
+        return roomRepository.findAvailableInRangeWithCapacity(startTime, endTime, minCapacity);
     }
     
     public List<Room> getRoomsByCapacity(Integer minCapacity) {

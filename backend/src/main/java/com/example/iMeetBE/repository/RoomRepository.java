@@ -56,4 +56,21 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
         ORDER BY r.name ASC
     """)
     List<Room> findAvailableInRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("""
+        SELECT r FROM Room r
+        WHERE r.capacity >= :minCapacity
+          AND NOT EXISTS (
+            SELECT m FROM Meeting m
+            WHERE m.room = r
+              AND m.bookingStatus <> 'CANCELLED'
+              AND m.startTime < :end
+              AND m.endTime > :start
+          )
+        ORDER BY r.name ASC
+    """)
+    List<Room> findAvailableInRangeWithCapacity(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end,
+        @Param("minCapacity") Integer minCapacity);
 }
