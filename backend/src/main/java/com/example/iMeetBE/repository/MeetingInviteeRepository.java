@@ -33,6 +33,18 @@ public interface MeetingInviteeRepository extends JpaRepository<MeetingInvitee, 
         @Param("email") String email,
         @Param("status") InviteStatus status
     );
+    
+    // Tìm các người tham gia đã chấp nhận và chưa được gửi reminder
+    @Query("""
+        SELECT mi FROM MeetingInvitee mi
+        WHERE mi.meeting = :meeting 
+        AND mi.status = :status 
+        AND mi.reminderSent = false
+        """)
+    List<MeetingInvitee> findByMeetingAndStatusAndReminderSentFalse(
+        @Param("meeting") Meeting meeting,
+        @Param("status") InviteStatus status
+    );
 }
 
 

@@ -84,6 +84,10 @@ public class EmailService {
         String logoImg = (logoUrl != null && !logoUrl.isBlank()) ?
             ("<img src=\"" + logoUrl + "\" alt=\"Logo\" style=\"height:48px; display:block; margin:0 auto 16px;\" />") : "";
 
+        // Format thời gian thành ngày và giờ riêng
+        String[] startDateTime = formatDateTimeSeparate(startTime);
+        String[] endDateTime = formatDateTimeSeparate(endTime);
+
         // Tạo URL cho accept và decline
         String acceptUrl = apiBaseUrl + "/api/invitations/" + safeToken + "/accept";
         String declineUrl = apiBaseUrl + "/api/invitations/" + safeToken + "/decline";
@@ -103,8 +107,20 @@ public class EmailService {
             "</td></tr>" +
 
             "<tr><td style=\"padding:24px 32px;\">" +
-            (safeDesc.isBlank() ? "" : ("<p style=\"margin:0 0 4px; line-height:1.5;\"><strong>Mô tả:</strong> " + escapeHtml(safeDesc) + "</p>")) +
-            "<p style=\"margin:0 0 4px; line-height:1.5;\"><strong>Thời gian:</strong> " + escapeHtml(startTime) + " - " + escapeHtml(endTime) + "</p>" +
+            (safeDesc.isBlank() ? "" : ("<p style=\"margin:0 0 12px; line-height:1.5;\"><strong>Mô tả:</strong> " + escapeHtml(safeDesc) + "</p>")) +
+            
+            // Ngày
+            "<div style=\"margin-bottom:8px;\">" +
+            "<div style=\"color:#6b7280; font-size:13px; margin-bottom:4px;\">Ngày:</div>" +
+            "<div style=\"color:#111827; font-size:15px; font-weight:500;\">" + escapeHtml(startDateTime[0]) + "</div>" +
+            "</div>" +
+            
+            // Giờ
+            "<div style=\"margin-bottom:16px;\">" +
+            "<div style=\"color:#6b7280; font-size:13px; margin-bottom:4px;\">Giờ:</div>" +
+            "<div style=\"color:#111827; font-size:15px; font-weight:500;\">" + escapeHtml(startDateTime[1]) + " - " + escapeHtml(endDateTime[1]) + "</div>" +
+            "</div>" +
+            
             (safeRoomName.isBlank() && safeRoomLocation.isBlank() ? "" : (
                 "<p style=\"margin:0 0 4px; line-height:1.5;\"><strong>Phòng:</strong> " + escapeHtml(safeRoomName) + "</p>" +
                 (safeRoomLocation.isBlank() ? "" : "<p style=\"margin:0 0 4px; line-height:1.5;\"><strong>Địa chỉ:</strong> " + escapeHtml(safeRoomLocation) + "</p>")
@@ -751,6 +767,144 @@ public class EmailService {
 
             // Footer
             "<tr><td style=\"padding:20px 24px; background:#f9fafb; border-top:1px solid #e5e7eb; color:#6b7280; font-size:12px; text-align:center;\">" +
+            "Email được gửi từ hệ thống " + escapeHtml(displayName != null ? displayName : "iMeet") + ". " +
+            "Vui lòng cập nhật lịch của bạn." +
+            "</td></tr>" +
+            "</table>" +
+            "</td></tr></table>" +
+            "</body></html>";
+    }
+
+    /**
+     * Gửi email nhắc nhở cho người tham gia trước 15 phút khi cuộc họp bắt đầu
+     * @param inviteeEmail Email của người tham gia
+     * @param inviteeName Tên của người tham gia
+     * @param meetingTitle Tiêu đề cuộc họp
+     * @param meetingDescription Mô tả cuộc họp
+     * @param meetingStartTime Thời gian bắt đầu cuộc họp
+     * @param meetingEndTime Thời gian kết thúc cuộc họp
+     * @param roomName Tên phòng
+     * @param roomLocation Địa chỉ phòng
+     * @param organizerName Tên người tổ chức
+     */
+    public void sendMeetingReminder(
+            String inviteeEmail,
+            String inviteeName,
+            String meetingTitle,
+            String meetingDescription,
+            String meetingStartTime,
+            String meetingEndTime,
+            String roomName,
+            String roomLocation,
+            String organizerName) {
+        try {
+            String subject = "Nhắc nhở: Cuộc họp sắp bắt đầu trong 15 phút - " + meetingTitle;
+            String htmlContent = buildMeetingReminderHtml(
+                inviteeName,
+                meetingTitle,
+                meetingDescription,
+                meetingStartTime,
+                meetingEndTime,
+                roomName,
+                roomLocation,
+                organizerName
+            );
+            
+            sendMeetingInviteHtml(inviteeEmail, subject, htmlContent);
+        } catch (Exception e) {
+            // Log lỗi nhưng không throw exception
+            System.err.println("Không thể gửi email nhắc nhở: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Tạo HTML email nhắc nhở cuộc họp (thiết kế giống form hủy cuộc họp)
+     */
+    private String buildMeetingReminderHtml(
+            String inviteeName,
+            String meetingTitle,
+            String meetingDescription,
+            String meetingStartTime,
+            String meetingEndTime,
+            String roomName,
+            String roomLocation,
+            String organizerName) {
+        
+        String safeInviteeName = inviteeName != null && !inviteeName.isBlank() ? inviteeName : "Bạn";
+        String safeTitle = meetingTitle != null ? meetingTitle : "";
+        String safeDescription = meetingDescription != null ? meetingDescription : "";
+        String safeOrganizerName = organizerName != null ? organizerName : "";
+        String logoImg = (logoUrl != null && !logoUrl.isBlank()) ?
+            ("<img src=\"" + logoUrl + "\" alt=\"Logo\" style=\"height:48px; display:block; margin:0 auto 16px;\" />") : "";
+
+        // Format thời gian thành ngày và giờ riêng
+        String[] startDateTime = formatDateTimeSeparate(meetingStartTime);
+        String[] endDateTime = formatDateTimeSeparate(meetingEndTime);
+
+        String safeRoomName = roomName != null ? roomName : "";
+        String safeRoomLocation = roomLocation != null ? roomLocation : "";
+
+        return "<!DOCTYPE html>" +
+            "<html><head><meta charset=\"UTF-8\"/>" +
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>" +
+            "<title>Nhắc nhở cuộc họp</title>" +
+            "</head><body style=\"margin:0; padding:0; background:#ffffff; font-family:Arial,Helvetica,sans-serif; color:#374151;\">" +
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background:#ffffff; padding:24px 0;\">" +
+            "<tr><td align=\"center\">" +
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"600\" style=\"max-width:600px; width:100%; background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;\">" +
+            
+            // Header - tông màu xám giống form hủy
+            "<tr><td style=\"padding:32px 32px 24px; text-align:center; background:#374151; color:#fff;\">" +
+            logoImg +
+            "<div style=\"font-size:13px; letter-spacing:1px; opacity:.9; color:#d1d5db;\">THÔNG BÁO NHẮC NHỞ CUỘC HỌP</div>" +
+            "<h1 style=\"margin:8px 0 0; font-size:22px; line-height:1.3; font-weight:600;\">Cuộc họp sắp bắt đầu</h1>" +
+            "</td></tr>" +
+
+            // Main message
+            "<tr><td style=\"padding:32px;\">" +
+            "<p style=\"margin:0 0 16px; font-size:15px; line-height:1.6; color:#374151;\">" +
+            "Chào <strong>" + escapeHtml(safeInviteeName) + "</strong>," +
+            "</p>" +
+            "<p style=\"margin:0 0 24px; font-size:15px; line-height:1.6; color:#6b7280;\">" +
+            "Cuộc họp mà bạn đã đăng ký tham gia sẽ bắt đầu trong <strong>15 phút</strong> nữa. Vui lòng chuẩn bị và tham gia đúng giờ." +
+            "</p>" +
+
+            // Meeting title
+            "<div style=\"background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:20px; margin-bottom:24px;\">" +
+            "<h3 style=\"margin:0 0 8px; font-size:18px; font-weight:600; color:#111827;\">" + escapeHtml(safeTitle) + "</h3>" +
+            (safeOrganizerName.isBlank() ? "" : 
+                "<p style=\"margin:0; font-size:14px; color:#6b7280;\"><strong>Người tổ chức:</strong> " + escapeHtml(safeOrganizerName) + "</p>") +
+            "</div>" +
+
+            // Meeting info
+            "<div style=\"background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:20px; margin-top:24px;\">" +
+            "<h4 style=\"margin:0 0 16px; font-size:16px; font-weight:600; color:#374151;\">Thông tin cuộc họp:</h4>" +
+            "<div style=\"font-size:14px; color:#6b7280; line-height:1.8;\">" +
+            "<div style=\"margin-bottom:12px;\">" +
+            "<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Ngày:</div>" +
+            "<div style=\"color:#374151;\">" + escapeHtml(startDateTime[0]) + "</div>" +
+            "</div>" +
+            "<div style=\"margin-bottom:12px;\">" +
+            "<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Giờ:</div>" +
+            "<div style=\"color:#374151;\">" + escapeHtml(startDateTime[1]) + " - " + escapeHtml(endDateTime[1]) + "</div>" +
+            "</div>" +
+            (safeRoomName.isBlank() ? "" : 
+                "<div style=\"margin-bottom:12px;\">" +
+                "<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Phòng:</div>" +
+                "<div style=\"color:#374151;\">" + escapeHtml(safeRoomName) + "</div>" +
+                "</div>") +
+            (safeRoomLocation.isBlank() ? "" : 
+                "<div>" +
+                "<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Địa chỉ:</div>" +
+                "<div style=\"color:#374151;\">" + escapeHtml(safeRoomLocation) + "</div>" +
+                "</div>") +
+            "</div>" +
+            "</div>" +
+
+            "</td></tr>" +
+
+            // Footer
+            "<tr><td style=\"padding:20px 24px; background:#f9fafb; border-top:1px solid #e5e7eb; color:#6b7280; font-size:12px; text-align:center; line-height:1.6;\">" +
             "Email được gửi từ hệ thống " + escapeHtml(displayName != null ? displayName : "iMeet") + ". " +
             "Vui lòng cập nhật lịch của bạn." +
             "</td></tr>" +

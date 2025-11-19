@@ -73,6 +73,9 @@ public class MeetingInvitee {
     @Column(name = "token", nullable = false, unique = true, length = 36)
     private String token;
 
+    @Column(name = "reminder_sent", nullable = false)
+    private Boolean reminderSent = false;
+
     @PrePersist
     protected void onCreate() {
         if (this.invitedAt == null) {
@@ -169,6 +172,14 @@ public class MeetingInvitee {
 
     public void setToken(String token) {
         this.token = token;
+    }
+
+    public Boolean getReminderSent() {
+        return reminderSent;
+    }
+
+    public void setReminderSent(Boolean reminderSent) {
+        this.reminderSent = reminderSent;
     }
 }
 
