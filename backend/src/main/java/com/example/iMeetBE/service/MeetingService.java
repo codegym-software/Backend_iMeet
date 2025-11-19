@@ -110,6 +110,11 @@ public class MeetingService {
     public ApiResponse<MeetingResponse> createMeeting(MeetingRequest request, User user) {
         try {
             // Validate thời gian
+            LocalDateTime now = LocalDateTime.now();
+            if (request.getStartTime().isBefore(now)) {
+                return ApiResponse.error("Không thể tạo cuộc họp với thời gian đã qua");
+            }
+            
             if (request.getEndTime().isBefore(request.getStartTime()) || 
                 request.getEndTime().isEqual(request.getStartTime())) {
                 return ApiResponse.error("Thời gian kết thúc phải sau thời gian bắt đầu");
@@ -332,6 +337,11 @@ public class MeetingService {
             }
             
             // Validate thời gian
+            LocalDateTime now = LocalDateTime.now();
+            if (request.getStartTime().isBefore(now)) {
+                return ApiResponse.error("Không thể cập nhật cuộc họp với thời gian đã qua");
+            }
+            
             if (request.getEndTime().isBefore(request.getStartTime()) || 
                 request.getEndTime().isEqual(request.getStartTime())) {
                 return ApiResponse.error("Thời gian kết thúc phải sau thời gian bắt đầu");
@@ -377,6 +387,14 @@ public class MeetingService {
                 return ApiResponse.error("Phòng đã được đặt trong khoảng thời gian này");
             }
             
+            // Lưu thông tin cũ trước khi cập nhật để so sánh
+            LocalDateTime oldStartTime = meeting.getStartTime();
+            LocalDateTime oldEndTime = meeting.getEndTime();
+            Room oldRoom = meeting.getRoom();
+            String oldRoomName = oldRoom != null ? oldRoom.getName() : null;
+            String oldRoomLocation = oldRoom != null ? oldRoom.getLocation() : null;
+            
+            // Cập nhật thông tin meeting
             meeting.setTitle(request.getTitle());
             meeting.setDescription(request.getDescription());
             meeting.setStartTime(request.getStartTime());
@@ -389,6 +407,79 @@ public class MeetingService {
             }
             
             Meeting updatedMeeting = meetingRepository.save(meeting);
+            
+            // Kiểm tra thay đổi thời gian hoặc phòng
+            boolean timeChanged = !oldStartTime.equals(request.getStartTime()) || !oldEndTime.equals(request.getEndTime());
+            boolean roomChanged = !oldRoom.getRoomId().equals(request.getRoomId());
+            
+            // Nếu có thay đổi thời gian hoặc phòng, gửi email thông báo cho người tham gia đã chấp nhận
+            if (timeChanged || roomChanged) {
+                // Lấy thông tin mới
+                Room newRoom = updatedMeeting.getRoom();
+                String newRoomName = newRoom != null ? newRoom.getName() : null;
+                String newRoomLocation = newRoom != null ? newRoom.getLocation() : null;
+                String meetingTitle = updatedMeeting.getTitle();
+                User organizer = updatedMeeting.getUser();
+                String organizerName = organizer != null && organizer.getFullName() != null 
+                    ? organizer.getFullName() 
+                    : (organizer != null ? organizer.getEmail() : "");
+                
+                // Lấy danh sách người tham gia đã chấp nhận
+                List<MeetingInvitee> acceptedInvitees = meetingInviteeRepository.findByMeeting(updatedMeeting)
+                    .stream()
+                    .filter(invitee -> invitee.getStatus() == InviteStatus.ACCEPTED)
+                    .toList();
+                
+                // Chuẩn bị dữ liệu để gửi email sau commit
+                if (!acceptedInvitees.isEmpty()) {
+                    final String finalOldStartTime = oldStartTime.toString();
+                    final String finalNewStartTime = request.getStartTime().toString();
+                    final String finalOldEndTime = oldEndTime.toString();
+                    final String finalNewEndTime = request.getEndTime().toString();
+                    final String finalOldRoomName = oldRoomName != null ? oldRoomName : "";
+                    final String finalNewRoomName = newRoomName != null ? newRoomName : "";
+                    final String finalOldRoomLocation = oldRoomLocation != null ? oldRoomLocation : "";
+                    final String finalNewRoomLocation = newRoomLocation != null ? newRoomLocation : "";
+                    final String finalMeetingTitle = meetingTitle != null ? meetingTitle : "";
+                    final String finalOrganizerName = organizerName;
+                    
+                    // Gửi email sau khi transaction commit thành công
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            for (MeetingInvitee invitee : acceptedInvitees) {
+                                try {
+                                    String inviteeEmail = invitee.getEmail();
+                                    User inviteeUser = invitee.getUser();
+                                    String inviteeName = inviteeUser != null && inviteeUser.getFullName() != null 
+                                        ? inviteeUser.getFullName() 
+                                        : inviteeEmail;
+                                    String viewToken = invitee.getToken();
+                                    
+                                    emailService.sendMeetingUpdateNotification(
+                                        inviteeEmail,
+                                        inviteeName,
+                                        finalMeetingTitle,
+                                        finalOldStartTime,
+                                        finalNewStartTime,
+                                        finalOldEndTime,
+                                        finalNewEndTime,
+                                        finalOldRoomName,
+                                        finalNewRoomName,
+                                        finalOldRoomLocation,
+                                        finalNewRoomLocation,
+                                        finalOrganizerName,
+                                        viewToken
+                                    );
+                                } catch (Exception e) {
+                                    // Log lỗi nhưng không ảnh hưởng đến việc cập nhật meeting
+                                    System.err.println("Không thể gửi email thông báo cập nhật cho " + invitee.getEmail() + ": " + e.getMessage());
+                                }
+                            }
+                        }
+                    });
+                }
+            }
             
             return ApiResponse.success(toMeetingResponse(updatedMeeting), 
                                       "Cập nhật cuộc họp thành công");

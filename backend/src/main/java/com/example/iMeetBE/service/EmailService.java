@@ -1,5 +1,10 @@
 package com.example.iMeetBE.service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.util.Locale;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -140,6 +145,32 @@ public class EmailService {
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
             .replace("'", "&#39;");
+    }
+
+    /**
+     * Format LocalDateTime thành ngày và giờ riêng biệt
+     * @param dateTimeString Chuỗi LocalDateTime (format ISO)
+     * @return Mảng [ngày, giờ] hoặc [dateTimeString, ""] nếu không parse được
+     */
+    private String[] formatDateTimeSeparate(String dateTimeString) {
+        try {
+            LocalDateTime dateTime;
+            // Thử parse với format ISO_LOCAL_DATE_TIME trước
+            try {
+                dateTime = LocalDateTime.parse(dateTimeString, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            } catch (Exception e) {
+                // Nếu fail, thử parse với format mặc định
+                dateTime = LocalDateTime.parse(dateTimeString);
+            }
+            String dayOfWeek = dateTime.getDayOfWeek().getDisplayName(TextStyle.FULL, new Locale("vi"));
+            String date = dateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            String time = dateTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+            String formattedDate = dayOfWeek + ", ngày " + date;
+            return new String[]{formattedDate, time};
+        } catch (Exception e) {
+            // Nếu không parse được, trả về chuỗi gốc
+            return new String[]{dateTimeString, ""};
+        }
     }
     
     private String buildEmailContent(String code) {
@@ -362,6 +393,233 @@ public class EmailService {
             // Footer
             "<tr><td style=\"padding:16px 24px; background:#f8fafc; color:#64748b; font-size:12px; text-align:center;\">" +
             "Email được gửi từ hệ thống " + escapeHtml(displayName != null ? displayName : "iMeet") + "." +
+            "</td></tr>" +
+            "</table>" +
+            "</td></tr></table>" +
+            "</body></html>";
+    }
+
+    /**
+     * Gửi email thông báo khi thông tin cuộc họp thay đổi (thời gian, địa điểm)
+     * @param inviteeEmail Email của người tham gia
+     * @param inviteeName Tên của người tham gia
+     * @param meetingTitle Tiêu đề cuộc họp
+     * @param oldStartTime Thời gian bắt đầu cũ
+     * @param newStartTime Thời gian bắt đầu mới
+     * @param oldEndTime Thời gian kết thúc cũ
+     * @param newEndTime Thời gian kết thúc mới
+     * @param oldRoomName Tên phòng cũ
+     * @param newRoomName Tên phòng mới
+     * @param oldRoomLocation Địa chỉ phòng cũ
+     * @param newRoomLocation Địa chỉ phòng mới
+     * @param organizerName Tên người tổ chức
+     * @param viewToken Token để xem chi tiết cuộc họp (có thể null)
+     */
+    public void sendMeetingUpdateNotification(
+            String inviteeEmail,
+            String inviteeName,
+            String meetingTitle,
+            String oldStartTime,
+            String newStartTime,
+            String oldEndTime,
+            String newEndTime,
+            String oldRoomName,
+            String newRoomName,
+            String oldRoomLocation,
+            String newRoomLocation,
+            String organizerName,
+            String viewToken) {
+        try {
+            String subject = "Thông báo: Cuộc họp đã được cập nhật - " + meetingTitle;
+            String htmlContent = buildMeetingUpdateNotificationHtml(
+                inviteeName,
+                meetingTitle,
+                oldStartTime,
+                newStartTime,
+                oldEndTime,
+                newEndTime,
+                oldRoomName,
+                newRoomName,
+                oldRoomLocation,
+                newRoomLocation,
+                organizerName,
+                viewToken
+            );
+            
+            sendMeetingInviteHtml(inviteeEmail, subject, htmlContent);
+        } catch (Exception e) {
+            // Log lỗi nhưng không throw exception để không ảnh hưởng đến việc cập nhật meeting
+            System.err.println("Không thể gửi email thông báo cập nhật cuộc họp: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Tạo HTML email thông báo cập nhật cuộc họp
+     */
+    private String buildMeetingUpdateNotificationHtml(
+            String inviteeName,
+            String meetingTitle,
+            String oldStartTime,
+            String newStartTime,
+            String oldEndTime,
+            String newEndTime,
+            String oldRoomName,
+            String newRoomName,
+            String oldRoomLocation,
+            String newRoomLocation,
+            String organizerName,
+            String viewToken) {
+        
+        String safeInviteeName = inviteeName != null && !inviteeName.isBlank() ? inviteeName : "Bạn";
+        String safeTitle = meetingTitle != null ? meetingTitle : "";
+        String safeOldStartTime = oldStartTime != null ? oldStartTime : "";
+        String safeNewStartTime = newStartTime != null ? newStartTime : "";
+        String safeOldEndTime = oldEndTime != null ? oldEndTime : "";
+        String safeNewEndTime = newEndTime != null ? newEndTime : "";
+        String safeOldRoomName = oldRoomName != null ? oldRoomName : "";
+        String safeNewRoomName = newRoomName != null ? newRoomName : "";
+        String safeOldRoomLocation = oldRoomLocation != null ? oldRoomLocation : "";
+        String safeNewRoomLocation = newRoomLocation != null ? newRoomLocation : "";
+        String safeOrganizerName = organizerName != null ? organizerName : "";
+        String logoImg = (logoUrl != null && !logoUrl.isBlank()) ?
+            ("<img src=\"" + logoUrl + "\" alt=\"Logo\" style=\"height:48px; display:block; margin:0 auto 16px;\" />") : "";
+
+        // Kiểm tra thay đổi
+        boolean timeChanged = !safeOldStartTime.equals(safeNewStartTime) || !safeOldEndTime.equals(safeNewEndTime);
+        boolean roomChanged = !safeOldRoomName.equals(safeNewRoomName) || !safeOldRoomLocation.equals(safeNewRoomLocation);
+
+        // Format thời gian thành ngày và giờ riêng
+        String[] oldStartDateTime = formatDateTimeSeparate(safeOldStartTime);
+        String[] oldEndDateTime = formatDateTimeSeparate(safeOldEndTime);
+        String[] newStartDateTime = formatDateTimeSeparate(safeNewStartTime);
+        String[] newEndDateTime = formatDateTimeSeparate(safeNewEndTime);
+
+        // Xây dựng phần thay đổi
+        StringBuilder changesHtml = new StringBuilder();
+        
+        if (timeChanged) {
+            changesHtml.append("<div style=\"margin-bottom:20px; padding:16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;\">")
+                .append("<div style=\"font-size:15px; font-weight:600; color:#374151; margin-bottom:12px;\">Thời gian đã thay đổi:</div>")
+                .append("<div style=\"font-size:14px; color:#6b7280; line-height:1.8;\">")
+                .append("<div style=\"margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #e5e7eb;\">")
+                .append("<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Trước đây:</div>")
+                .append("<div style=\"color:#374151;\"><strong>Ngày:</strong> ").append(escapeHtml(oldStartDateTime[0])).append("</div>")
+                .append("<div style=\"color:#374151;\"><strong>Giờ:</strong> ").append(escapeHtml(oldStartDateTime[1]))
+                .append(" - ").append(escapeHtml(oldEndDateTime[1])).append("</div>")
+                .append("</div>")
+                .append("<div>")
+                .append("<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Mới:</div>")
+                .append("<div style=\"color:#374151;\"><strong>Ngày:</strong> ").append(escapeHtml(newStartDateTime[0])).append("</div>")
+                .append("<div style=\"color:#374151;\"><strong>Giờ:</strong> ").append(escapeHtml(newStartDateTime[1]))
+                .append(" - ").append(escapeHtml(newEndDateTime[1])).append("</div>")
+                .append("</div>")
+                .append("</div></div>");
+        }
+        
+        if (roomChanged) {
+            changesHtml.append("<div style=\"margin-bottom:20px; padding:16px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;\">")
+                .append("<div style=\"font-size:15px; font-weight:600; color:#374151; margin-bottom:12px;\">Địa điểm đã thay đổi:</div>")
+                .append("<div style=\"font-size:14px; color:#6b7280; line-height:1.8;\">");
+            
+            if (!safeOldRoomName.equals(safeNewRoomName)) {
+                changesHtml.append("<div style=\"margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #e5e7eb;\">")
+                    .append("<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Phòng cũ:</div>")
+                    .append("<div style=\"color:#374151;\">").append(escapeHtml(safeOldRoomName)).append("</div>")
+                    .append("</div>")
+                    .append("<div style=\"margin-bottom:8px;\">")
+                    .append("<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Phòng mới:</div>")
+                    .append("<div style=\"color:#374151;\">").append(escapeHtml(safeNewRoomName)).append("</div>")
+                    .append("</div>");
+            }
+            
+            if (!safeOldRoomLocation.equals(safeNewRoomLocation)) {
+                changesHtml.append("<div style=\"margin-top:8px;\">")
+                    .append("<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Địa chỉ:</div>")
+                    .append("<div style=\"color:#374151;\">").append(escapeHtml(safeOldRoomLocation)).append("</div>")
+                    .append("<div style=\"color:#374151; margin-top:4px;\">").append(escapeHtml(safeNewRoomLocation)).append("</div>")
+                    .append("</div>");
+            }
+            
+            changesHtml.append("</div></div>");
+        }
+
+        // Link xem chi tiết
+        String detailLinkHtml = "";
+        if (viewToken != null && !viewToken.isBlank()) {
+            String meetingDetailUrl = frontendBaseUrl + "/my-meetings/view?token=" + viewToken;
+            detailLinkHtml = "<div style=\"margin-top:24px; text-align:center;\">" +
+                "<a href=\"" + meetingDetailUrl + "\" style=\"display:inline-block; padding:12px 24px; background:#374151; color:#fff; text-decoration:none; border-radius:6px; font-weight:600; font-size:14px;\">Xem chi tiết cuộc họp</a>" +
+                "</div>";
+        }
+
+        return "<!DOCTYPE html>" +
+            "<html><head><meta charset=\"UTF-8\"/>" +
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>" +
+            "<title>Thông báo cập nhật cuộc họp</title>" +
+            "</head><body style=\"margin:0; padding:0; background:#ffffff; font-family:Arial,Helvetica,sans-serif; color:#374151;\">" +
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background:#ffffff; padding:24px 0;\">" +
+            "<tr><td align=\"center\">" +
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"600\" style=\"max-width:600px; width:100%; background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;\">" +
+            
+            // Header
+            "<tr><td style=\"padding:32px 32px 24px; text-align:center; background:#374151; color:#fff;\">" +
+            logoImg +
+            "<div style=\"font-size:13px; letter-spacing:1px; opacity:.9; color:#d1d5db;\">THÔNG BÁO CẬP NHẬT</div>" +
+            "<h1 style=\"margin:8px 0 0; font-size:22px; line-height:1.3; font-weight:600;\">Cuộc họp đã được cập nhật</h1>" +
+            "</td></tr>" +
+
+            // Main message
+            "<tr><td style=\"padding:32px;\">" +
+            "<p style=\"margin:0 0 16px; font-size:15px; line-height:1.6; color:#374151;\">" +
+            "Chào <strong>" + escapeHtml(safeInviteeName) + "</strong>," +
+            "</p>" +
+            "<p style=\"margin:0 0 24px; font-size:15px; line-height:1.6; color:#6b7280;\">" +
+            "Cuộc họp mà bạn tham gia đã được cập nhật thông tin. Vui lòng xem các thay đổi bên dưới:" +
+            "</p>" +
+
+            // Meeting title
+            "<div style=\"background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:20px; margin-bottom:24px;\">" +
+            "<h3 style=\"margin:0 0 8px; font-size:18px; font-weight:600; color:#111827;\">" + escapeHtml(safeTitle) + "</h3>" +
+            (safeOrganizerName.isBlank() ? "" : 
+                "<p style=\"margin:0; font-size:14px; color:#6b7280;\"><strong>Người tổ chức:</strong> " + escapeHtml(safeOrganizerName) + "</p>") +
+            "</div>" +
+
+            // Changes section
+            changesHtml.toString() +
+
+            // Updated meeting info
+            "<div style=\"background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:20px; margin-top:24px;\">" +
+            "<h4 style=\"margin:0 0 16px; font-size:16px; font-weight:600; color:#374151;\">Thông tin cuộc họp sau khi cập nhật:</h4>" +
+            "<div style=\"font-size:14px; color:#6b7280; line-height:1.8;\">" +
+            "<div style=\"margin-bottom:12px;\">" +
+            "<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Ngày:</div>" +
+            "<div style=\"color:#374151;\">" + escapeHtml(newStartDateTime[0]) + "</div>" +
+            "</div>" +
+            "<div style=\"margin-bottom:12px;\">" +
+            "<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Giờ:</div>" +
+            "<div style=\"color:#374151;\">" + escapeHtml(newStartDateTime[1]) + " - " + escapeHtml(newEndDateTime[1]) + "</div>" +
+            "</div>" +
+            (safeNewRoomName.isBlank() ? "" : 
+                "<div style=\"margin-bottom:12px;\">" +
+                "<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Phòng:</div>" +
+                "<div style=\"color:#374151;\">" + escapeHtml(safeNewRoomName) + "</div>" +
+                "</div>") +
+            (safeNewRoomLocation.isBlank() ? "" : 
+                "<div>" +
+                "<div style=\"color:#9ca3af; font-size:12px; margin-bottom:4px;\">Địa chỉ:</div>" +
+                "<div style=\"color:#374151;\">" + escapeHtml(safeNewRoomLocation) + "</div>" +
+                "</div>") +
+            "</div>" +
+            "</div>" +
+
+            detailLinkHtml +
+
+            "</td></tr>" +
+
+            // Footer
+            "<tr><td style=\"padding:20px 24px; background:#f9fafb; border-top:1px solid #e5e7eb; color:#6b7280; font-size:12px; text-align:center;\">" +
+            "Email được gửi từ hệ thống " + escapeHtml(displayName != null ? displayName : "iMeet") + ". " +
+            "Vui lòng cập nhật lịch của bạn theo thông tin mới." +
             "</td></tr>" +
             "</table>" +
             "</td></tr></table>" +
