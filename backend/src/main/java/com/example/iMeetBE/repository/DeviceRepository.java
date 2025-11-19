@@ -28,7 +28,7 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
     
     // Tìm kiếm theo tên chính xác
     Optional<Device> findByName(String name);
-    
+
     // Tìm kiếm theo mô tả chứa từ khóa
     @Query("SELECT d FROM Device d WHERE d.description LIKE %:keyword%")
     List<Device> findByDescriptionContaining(@Param("keyword") String keyword);

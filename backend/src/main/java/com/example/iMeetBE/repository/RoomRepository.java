@@ -73,4 +73,54 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
         @Param("start") LocalDateTime start,
         @Param("end") LocalDateTime end,
         @Param("minCapacity") Integer minCapacity);
+
+    @Query("""
+        SELECT r FROM Room r
+        WHERE (:minCapacity IS NULL OR r.capacity >= :minCapacity)
+          AND NOT EXISTS (
+            SELECT m FROM Meeting m
+            WHERE m.room = r
+              AND m.bookingStatus <> 'CANCELLED'
+              AND m.startTime < :end
+              AND m.endTime > :start
+          )
+          AND (
+            SELECT COUNT(DISTINCT rd.device.deviceId)
+            FROM RoomDevice rd
+            WHERE rd.room = r
+              AND rd.device.deviceId IN :deviceIds
+          ) = :requiredDeviceCount
+        ORDER BY r.name ASC
+    """)
+    List<Room> findAvailableInRangeWithDevices(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end,
+        @Param("minCapacity") Integer minCapacity,
+        @Param("deviceIds") List<Long> deviceIds,
+        @Param("requiredDeviceCount") long requiredDeviceCount);
+
+    @Query("""
+        SELECT r FROM Room r
+        WHERE (:minCapacity IS NULL OR r.capacity >= :minCapacity)
+          AND NOT EXISTS (
+            SELECT m FROM Meeting m
+            WHERE m.room = r
+              AND m.bookingStatus <> 'CANCELLED'
+              AND m.startTime < :end
+              AND m.endTime > :start
+          )
+          AND (
+            SELECT COUNT(DISTINCT rd.device.deviceType)
+            FROM RoomDevice rd
+            WHERE rd.room = r
+              AND rd.device.deviceType IN :deviceTypes
+          ) = :requiredTypeCount
+        ORDER BY r.name ASC
+    """)
+    List<Room> findAvailableInRangeWithDeviceTypes(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end,
+        @Param("minCapacity") Integer minCapacity,
+        @Param("deviceTypes") List<String> deviceTypes,
+        @Param("requiredTypeCount") long requiredTypeCount);
 }

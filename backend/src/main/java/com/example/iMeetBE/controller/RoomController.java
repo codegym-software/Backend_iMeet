@@ -107,16 +107,26 @@ public class RoomController {
     public ResponseEntity<ApiResponse<List<RoomResponse>>> getAvailableRoomsInRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
-            @RequestParam(required = false) Integer minCapacity) {
+            @RequestParam(required = false) Integer minCapacity,
+            @RequestParam(name = "requiredDeviceIds", required = false) List<Long> requiredDeviceIds,
+            @RequestParam(name = "requiredDeviceTypes", required = false) List<String> requiredDeviceTypes) {
         try {
             if (!endTime.isAfter(startTime)) {
                 return ResponseEntity.badRequest().body(ApiResponse.error("endTime phải sau startTime"));
             }
-            List<Room> rooms = roomService.getAvailableRoomsInRange(startTime, endTime, minCapacity);
+            List<Room> rooms = roomService.getAvailableRoomsInRange(
+                startTime,
+                endTime,
+                minCapacity,
+                requiredDeviceIds,
+                requiredDeviceTypes
+            );
             List<RoomResponse> roomResponses = rooms.stream()
                 .map(RoomResponse::new)
                 .toList();
             return ResponseEntity.ok(ApiResponse.success(roomResponses, "Lấy danh sách phòng trống theo khoảng thời gian thành công"));
+        } catch (IllegalArgumentException iae) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(iae.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Lỗi khi lấy phòng trống theo khoảng thời gian: " + e.getMessage()));
