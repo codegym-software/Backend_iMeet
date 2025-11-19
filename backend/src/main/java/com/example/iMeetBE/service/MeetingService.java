@@ -508,9 +508,65 @@ public class MeetingService {
                 return ApiResponse.error("Cuộc họp đã được hủy trước đó");
             }
             
+            // Lấy thông tin meeting trước khi hủy để gửi email
+            Room room = meeting.getRoom();
+            User organizer = meeting.getUser();
+            String meetingTitle = meeting.getTitle();
+            LocalDateTime meetingStartTime = meeting.getStartTime();
+            LocalDateTime meetingEndTime = meeting.getEndTime();
+            String roomName = room != null ? room.getName() : null;
+            String roomLocation = room != null ? room.getLocation() : null;
+            String organizerName = organizer != null && organizer.getFullName() != null 
+                ? organizer.getFullName() 
+                : (organizer != null ? organizer.getEmail() : "");
+            
+            // Lấy danh sách tất cả người tham gia (cả ACCEPTED và PENDING)
+            List<MeetingInvitee> allInvitees = meetingInviteeRepository.findByMeeting(meeting);
+            
             // Cập nhật trạng thái thành CANCELLED thay vì xóa
             meeting.setBookingStatus(BookingStatus.CANCELLED);
             meetingRepository.save(meeting);
+            
+            // Gửi email thông báo hủy cho tất cả người tham gia sau khi commit
+            if (!allInvitees.isEmpty()) {
+                final String finalMeetingTitle = meetingTitle != null ? meetingTitle : "";
+                final String finalMeetingStartTime = meetingStartTime != null ? meetingStartTime.toString() : "";
+                final String finalMeetingEndTime = meetingEndTime != null ? meetingEndTime.toString() : "";
+                final String finalRoomName = roomName != null ? roomName : "";
+                final String finalRoomLocation = roomLocation != null ? roomLocation : "";
+                final String finalOrganizerName = organizerName;
+                final List<MeetingInvitee> finalAllInvitees = allInvitees;
+                
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        for (MeetingInvitee invitee : finalAllInvitees) {
+                            final MeetingInvitee finalInvitee = invitee;
+                            try {
+                                String inviteeEmail = finalInvitee.getEmail();
+                                User inviteeUser = finalInvitee.getUser();
+                                String inviteeName = inviteeUser != null && inviteeUser.getFullName() != null 
+                                    ? inviteeUser.getFullName() 
+                                    : inviteeEmail;
+                                
+                                emailService.sendMeetingCancellationNotification(
+                                    inviteeEmail,
+                                    inviteeName,
+                                    finalMeetingTitle,
+                                    finalMeetingStartTime,
+                                    finalMeetingEndTime,
+                                    finalRoomName,
+                                    finalRoomLocation,
+                                    finalOrganizerName
+                                );
+                            } catch (Exception e) {
+                                // Log lỗi nhưng không ảnh hưởng đến việc hủy meeting
+                                System.err.println("Không thể gửi email thông báo hủy cho " + finalInvitee.getEmail() + ": " + e.getMessage());
+                            }
+                        }
+                    }
+                });
+            }
             
             return ApiResponse.success(null, "Hủy cuộc họp thành công");
         } catch (Exception e) {
@@ -533,8 +589,80 @@ public class MeetingService {
                 return ApiResponse.error("Bạn không có quyền cập nhật trạng thái cuộc họp này");
             }
             
+            // Lấy trạng thái cũ để kiểm tra
+            BookingStatus oldStatus = meeting.getBookingStatus();
+            boolean isCancelling = (status == BookingStatus.CANCELLED && oldStatus != BookingStatus.CANCELLED);
+            
+            // Lấy thông tin meeting nếu đang hủy để gửi email
+            Room room = null;
+            User organizer = null;
+            String meetingTitle = null;
+            LocalDateTime meetingStartTime = null;
+            LocalDateTime meetingEndTime = null;
+            String roomName = null;
+            String roomLocation = null;
+            String organizerName = null;
+            List<MeetingInvitee> allInvitees = null;
+            
+            if (isCancelling) {
+                room = meeting.getRoom();
+                organizer = meeting.getUser();
+                meetingTitle = meeting.getTitle();
+                meetingStartTime = meeting.getStartTime();
+                meetingEndTime = meeting.getEndTime();
+                roomName = room != null ? room.getName() : null;
+                roomLocation = room != null ? room.getLocation() : null;
+                organizerName = organizer != null && organizer.getFullName() != null 
+                    ? organizer.getFullName() 
+                    : (organizer != null ? organizer.getEmail() : "");
+                
+                // Lấy danh sách tất cả người tham gia (cả ACCEPTED và PENDING)
+                allInvitees = meetingInviteeRepository.findByMeeting(meeting);
+            }
+            
             meeting.setBookingStatus(status);
             Meeting updatedMeeting = meetingRepository.save(meeting);
+            
+            // Gửi email thông báo hủy nếu đang hủy cuộc họp
+            if (isCancelling && allInvitees != null && !allInvitees.isEmpty()) {
+                final String finalMeetingTitle = meetingTitle != null ? meetingTitle : "";
+                final String finalMeetingStartTime = meetingStartTime != null ? meetingStartTime.toString() : "";
+                final String finalMeetingEndTime = meetingEndTime != null ? meetingEndTime.toString() : "";
+                final String finalRoomName = roomName != null ? roomName : "";
+                final String finalRoomLocation = roomLocation != null ? roomLocation : "";
+                final String finalOrganizerName = organizerName;
+                final List<MeetingInvitee> finalAllInvitees = allInvitees;
+                
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        for (MeetingInvitee invitee : finalAllInvitees) {
+                            final MeetingInvitee finalInvitee = invitee;
+                            try {
+                                String inviteeEmail = finalInvitee.getEmail();
+                                User inviteeUser = finalInvitee.getUser();
+                                String inviteeName = inviteeUser != null && inviteeUser.getFullName() != null 
+                                    ? inviteeUser.getFullName() 
+                                    : inviteeEmail;
+                                
+                                emailService.sendMeetingCancellationNotification(
+                                    inviteeEmail,
+                                    inviteeName,
+                                    finalMeetingTitle,
+                                    finalMeetingStartTime,
+                                    finalMeetingEndTime,
+                                    finalRoomName,
+                                    finalRoomLocation,
+                                    finalOrganizerName
+                                );
+                            } catch (Exception e) {
+                                // Log lỗi nhưng không ảnh hưởng đến việc cập nhật status
+                                System.err.println("Không thể gửi email thông báo hủy cho " + finalInvitee.getEmail() + ": " + e.getMessage());
+                            }
+                        }
+                    }
+                });
+            }
             
             return ApiResponse.success(toMeetingResponse(updatedMeeting), 
                                       "Cập nhật trạng thái cuộc họp thành công");
