@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
+import com.example.iMeetBE.repository.UserRepository;
+import com.example.iMeetBE.repository.MeetingRepository;
 
 @RestController
 @RequestMapping("/api/aws")
@@ -21,6 +23,12 @@ public class AwsTestController {
 
     @Autowired
     private AWSCognitoIdentityProvider cognitoClient;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private MeetingRepository meetingRepository;
 
     @Value("${aws.cognito.user-pool-id}")
     private String userPoolId;
@@ -68,6 +76,53 @@ public class AwsTestController {
             return ResponseEntity.status(500).body(Map.of(
                 "success", false,
                 "message", "Failed to get AWS configuration: " + e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/check-google-sync")
+    public ResponseEntity<?> checkGoogleCalendarSync() {
+        try {
+            long totalUsers = userRepository.count();
+            long usersWithGoogleSync = userRepository.findAll().stream()
+                .filter(user -> user.getGoogleCalendarSyncEnabled() != null 
+                    && user.getGoogleCalendarSyncEnabled()
+                    && user.getGoogleRefreshToken() != null)
+                .count();
+
+            // Lấy tất cả meetings của users đã sync Google Calendar
+            var syncedUsersDetails = userRepository.findAll().stream()
+                .filter(user -> user.getGoogleCalendarSyncEnabled() != null 
+                    && user.getGoogleCalendarSyncEnabled()
+                    && user.getGoogleRefreshToken() != null)
+                .map(user -> {
+                    var userMeetings = meetingRepository.findByUserId(user.getId());
+                    long totalMeetings = userMeetings.size();
+                    long syncedMeetings = userMeetings.stream()
+                        .filter(meeting -> meeting.getGoogleEventId() != null && !meeting.getGoogleEventId().isEmpty())
+                        .count();
+                    
+                    return Map.of(
+                        "email", user.getEmail(),
+                        "syncEnabled", user.getGoogleCalendarSyncEnabled(),
+                        "hasRefreshToken", user.getGoogleRefreshToken() != null,
+                        "totalMeetings", totalMeetings,
+                        "syncedMeetings", syncedMeetings
+                    );
+                })
+                .toList();
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "totalUsers", totalUsers,
+                "usersWithGoogleSync", usersWithGoogleSync,
+                "syncedUsers", syncedUsersDetails
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Failed to check Google sync: " + e.getMessage()
             ));
         }
     }

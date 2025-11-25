@@ -61,6 +61,9 @@ public class Meeting {
     @Column(name = "participants")
     private Long participants = 0L; // Số người được mời
     
+    @Column(name = "google_event_id")
+    private String googleEventId; // ID của event trên Google Calendar
+    
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -181,6 +184,14 @@ public class Meeting {
     
     public void setParticipants(Long participants) {
         this.participants = participants;
+    }
+    
+    public String getGoogleEventId() {
+        return googleEventId;
+    }
+    
+    public void setGoogleEventId(String googleEventId) {
+        this.googleEventId = googleEventId;
     }
 }
 

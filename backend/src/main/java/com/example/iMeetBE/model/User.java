@@ -39,6 +39,15 @@ public class User {
     @Column(name = "access_token", columnDefinition = "TEXT")
     private String accessToken;
 
+    @Column(name = "google_refresh_token", columnDefinition = "TEXT")
+    private String googleRefreshToken;
+
+    @Column(name = "google_calendar_sync_enabled")
+    private Boolean googleCalendarSyncEnabled = false;
+
+    @Column(name = "google_token_expiry")
+    private LocalDateTime googleTokenExpiry;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private UserRole role = UserRole.USER;
@@ -134,6 +143,30 @@ public class User {
 
     public void setAccessToken(String accessToken) {
         this.accessToken = accessToken;
+    }
+
+    public String getGoogleRefreshToken() {
+        return googleRefreshToken;
+    }
+
+    public void setGoogleRefreshToken(String googleRefreshToken) {
+        this.googleRefreshToken = googleRefreshToken;
+    }
+
+    public Boolean getGoogleCalendarSyncEnabled() {
+        return googleCalendarSyncEnabled != null ? googleCalendarSyncEnabled : false;
+    }
+
+    public void setGoogleCalendarSyncEnabled(Boolean googleCalendarSyncEnabled) {
+        this.googleCalendarSyncEnabled = googleCalendarSyncEnabled;
+    }
+
+    public LocalDateTime getGoogleTokenExpiry() {
+        return googleTokenExpiry;
+    }
+
+    public void setGoogleTokenExpiry(LocalDateTime googleTokenExpiry) {
+        this.googleTokenExpiry = googleTokenExpiry;
     }
 
     public UserRole getRole() {
