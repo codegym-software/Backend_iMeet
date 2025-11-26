@@ -48,6 +48,9 @@ public class MeetingService {
     private MeetingInviteeRepository meetingInviteeRepository;
 
     @Autowired
+    private com.example.iMeetBE.repository.MeetingDeviceRepository meetingDeviceRepository;
+
+    @Autowired
     private EmailService emailService;
 
     @Autowired
@@ -84,7 +87,7 @@ public class MeetingService {
         }
     }
     
-    // Helper method để tạo MeetingResponse từ Meeting với số participants
+    // Helper method để tạo MeetingResponse từ Meeting với số participants và devices
     private MeetingResponse toMeetingResponse(Meeting meeting) {
         MeetingResponse response = new MeetingResponse(meeting);
         // Sử dụng giá trị từ database, nếu null thì tính lại và cập nhật
@@ -96,6 +99,60 @@ public class MeetingService {
             meetingRepository.save(meeting);
         }
         response.setParticipants(participantCount);
+        
+        // Load devices for this meeting (with eager loading to avoid lazy loading issues)
+        try {
+            List<com.example.iMeetBE.model.MeetingDevice> meetingDevices = 
+                meetingDeviceRepository.findByMeetingMeetingIdWithDetails(meeting.getMeetingId());
+            
+            System.out.println("Loading devices for meeting " + meeting.getMeetingId() + ": found " + meetingDevices.size() + " devices");
+            
+            List<com.example.iMeetBE.dto.MeetingDeviceResponse> deviceResponses = meetingDevices.stream()
+                .map(md -> {
+                    com.example.iMeetBE.dto.MeetingDeviceResponse deviceResponse = 
+                        new com.example.iMeetBE.dto.MeetingDeviceResponse();
+                    deviceResponse.setMeetingDeviceId(md.getMeetingDeviceId());
+                    deviceResponse.setMeetingId(meeting.getMeetingId());
+                    deviceResponse.setMeetingTitle(meeting.getTitle());
+                    
+                    // Force lazy loading by accessing the device
+                    if (md.getDevice() != null) {
+                        deviceResponse.setDeviceId(md.getDevice().getDeviceId());
+                        deviceResponse.setDeviceName(md.getDevice().getName());
+                        deviceResponse.setDeviceType(md.getDevice().getDeviceType() != null 
+                            ? md.getDevice().getDeviceType().name() : null);
+                        System.out.println("  - Device: " + md.getDevice().getDeviceId() + " (" + md.getDevice().getName() + "), qty: " + md.getQuantityBorrowed());
+                    } else {
+                        System.out.println("  - Device is null for MeetingDevice ID: " + md.getMeetingDeviceId());
+                    }
+                    
+                    deviceResponse.setQuantityBorrowed(md.getQuantityBorrowed());
+                    deviceResponse.setStatus(md.getStatus());
+                    
+                    // Force lazy loading by accessing the requestedBy user
+                    if (md.getRequestedBy() != null) {
+                        deviceResponse.setRequestedById(md.getRequestedBy().getId());
+                        deviceResponse.setRequestedByUsername(md.getRequestedBy().getUsername());
+                        deviceResponse.setRequestedByFullName(md.getRequestedBy().getFullName());
+                    }
+                    
+                    deviceResponse.setBorrowedAt(md.getBorrowedAt());
+                    deviceResponse.setReturnedAt(md.getReturnedAt());
+                    deviceResponse.setNotes(md.getNotes());
+                    
+                    return deviceResponse;
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            System.out.println("Successfully loaded " + deviceResponses.size() + " device responses");
+            response.setDevices(deviceResponses);
+        } catch (Exception e) {
+            // Log error but don't fail the whole response
+            System.err.println("Error loading devices for meeting " + meeting.getMeetingId() + ": " + e.getMessage());
+            e.printStackTrace();
+            response.setDevices(new java.util.ArrayList<>());
+        }
+        
         return response;
     }
     
@@ -329,6 +386,30 @@ public class MeetingService {
         }
     }
     
+    // Lấy danh sách invitees của meeting
+    @Transactional(readOnly = true)
+    public ApiResponse<List<InviteResponse>> getMeetingInvitees(Integer meetingId) {
+        try {
+            // Kiểm tra meeting có tồn tại không
+            Optional<Meeting> meetingOpt = meetingRepository.findById(meetingId);
+            if (!meetingOpt.isPresent()) {
+                return ApiResponse.error("Không tìm thấy cuộc họp với ID: " + meetingId);
+            }
+            
+            // Lấy danh sách invitees
+            List<MeetingInvitee> invitees = meetingInviteeRepository.findByMeeting(meetingOpt.get());
+            
+            // Convert sang InviteResponse
+            List<InviteResponse> responses = invitees.stream()
+                .map(InviteResponse::new)
+                .toList();
+            
+            return ApiResponse.success(responses, "Lấy danh sách người được mời thành công");
+        } catch (Exception e) {
+            return ApiResponse.error("Lỗi khi lấy danh sách người được mời: " + e.getMessage());
+        }
+    }
+    
     // Cập nhật cuộc họp
     public ApiResponse<MeetingResponse> updateMeeting(Integer meetingId, MeetingRequest request, String userId, String userRole) {
         try {
@@ -518,6 +599,50 @@ public class MeetingService {
             return ApiResponse.success(responses, "Lấy danh sách cuộc họp theo người dùng thành công");
         } catch (Exception e) {
             return ApiResponse.error("Lỗi khi lấy danh sách cuộc họp theo người dùng: " + e.getMessage());
+        }
+    }
+    
+    // Lấy tất cả cuộc họp của user (bao gồm cả owned và invited)
+    public ApiResponse<List<MeetingResponse>> getMyMeetings(User user) {
+        try {
+            java.util.Set<Meeting> allMeetings = new java.util.HashSet<>();
+            
+            // 1. Lấy meetings mà user là owner
+            List<Meeting> ownedMeetings = meetingRepository.findByUserId(user.getId());
+            allMeetings.addAll(ownedMeetings);
+            
+            // 2. Lấy meetings mà user được mời (ACCEPTED hoặc PENDING)
+            String userEmail = user.getEmail().toLowerCase();
+            List<com.example.iMeetBE.model.MeetingInvitee> acceptedInvites = meetingInviteeRepository
+                .findByEmailAndStatusWithMeeting(userEmail, com.example.iMeetBE.model.InviteStatus.ACCEPTED);
+            List<com.example.iMeetBE.model.MeetingInvitee> pendingInvites = meetingInviteeRepository
+                .findByEmailAndStatusWithMeeting(userEmail, com.example.iMeetBE.model.InviteStatus.PENDING);
+            
+            for (com.example.iMeetBE.model.MeetingInvitee invitee : acceptedInvites) {
+                if (invitee.getMeeting() != null) {
+                    allMeetings.add(invitee.getMeeting());
+                }
+            }
+            for (com.example.iMeetBE.model.MeetingInvitee invitee : pendingInvites) {
+                if (invitee.getMeeting() != null) {
+                    allMeetings.add(invitee.getMeeting());
+                }
+            }
+            
+            // Convert to list and sort by startTime
+            List<MeetingResponse> responses = allMeetings.stream()
+                .map(this::toMeetingResponse)
+                .sorted((m1, m2) -> {
+                    if (m1.getStartTime() == null && m2.getStartTime() == null) return 0;
+                    if (m1.getStartTime() == null) return 1;
+                    if (m2.getStartTime() == null) return -1;
+                    return m1.getStartTime().compareTo(m2.getStartTime());
+                })
+                .toList();
+            
+            return ApiResponse.success(responses, "Lấy danh sách cuộc họp của bạn thành công");
+        } catch (Exception e) {
+            return ApiResponse.error("Lỗi khi lấy danh sách cuộc họp: " + e.getMessage());
         }
     }
     

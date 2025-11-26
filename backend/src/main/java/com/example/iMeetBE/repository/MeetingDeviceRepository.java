@@ -18,6 +18,13 @@ public interface MeetingDeviceRepository extends JpaRepository<MeetingDevice, In
     // Find all devices borrowed for a specific meeting
     List<MeetingDevice> findByMeetingMeetingId(Integer meetingId);
     
+    // Find all devices borrowed for a specific meeting with eager loading
+    @Query("SELECT md FROM MeetingDevice md " +
+           "LEFT JOIN FETCH md.device d " +
+           "LEFT JOIN FETCH md.requestedBy u " +
+           "WHERE md.meeting.meetingId = :meetingId")
+    List<MeetingDevice> findByMeetingMeetingIdWithDetails(@Param("meetingId") Integer meetingId);
+    
     // Find all devices borrowed by a specific user
     List<MeetingDevice> findByRequestedById(String userId);
     

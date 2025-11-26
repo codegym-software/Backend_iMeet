@@ -56,7 +56,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception e) {
-            // Token không hợp lệ, tiếp tục filter chain
+            // Token không hợp lệ hoặc có lỗi xảy ra
+            // Log lỗi để debug (có thể bỏ comment nếu cần)
+            // logger.warn("JWT validation failed: " + e.getMessage());
+            // Tiếp tục filter chain để Spring Security xử lý authentication
         }
         
         filterChain.doFilter(request, response);

@@ -65,7 +65,7 @@ application.yaml
 application-h2.yaml
 application-*.yaml
 application-*.properties
-
+templates/
 # AWS credentials
 aws-credentials.properties
 .aws/
@@ -90,3 +90,5 @@ logs/
 
 # Allow specific JAR file
 !target/iMeet.jar
+
+util/

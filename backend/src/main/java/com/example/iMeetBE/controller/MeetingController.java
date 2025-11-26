@@ -5,7 +5,9 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -30,6 +32,7 @@ import com.example.iMeetBE.model.BookingStatus;
 import com.example.iMeetBE.model.User;
 import com.example.iMeetBE.repository.UserRepository;
 import com.example.iMeetBE.service.MeetingService;
+import com.example.iMeetBE.util.IcsGenerator;
 
 import jakarta.validation.Valid;
 
@@ -209,7 +212,7 @@ public class MeetingController {
         return ResponseEntity.status(status).body(response);
     }
     
-    // Lấy cuộc họp của user hiện tại
+    // Lấy cuộc họp của user hiện tại (bao gồm cả owned và invited)
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<MeetingResponse>>> getMyMeetings(Authentication authentication) {
         try {
@@ -226,8 +229,8 @@ public class MeetingController {
             User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
             
-            // Lấy cuộc họp của user
-            ApiResponse<List<MeetingResponse>> response = meetingService.getMeetingsByUser(user.getId());
+            // Lấy tất cả cuộc họp của user (owned + invited)
+            ApiResponse<List<MeetingResponse>> response = meetingService.getMyMeetings(user);
             HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
             return ResponseEntity.status(status).body(response);
         } catch (Exception e) {
@@ -307,6 +310,82 @@ public class MeetingController {
         ApiResponse<List<MeetingResponse>> response = meetingService.getRoomSchedule(roomId, startTime, endTime);
         HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
         return ResponseEntity.status(status).body(response);
+    }
+    
+    // Lấy danh sách invitees của meeting
+    @GetMapping("/{meetingId}/invitees")
+    public ResponseEntity<ApiResponse<List<InviteResponse>>> getMeetingInvitees(
+            @PathVariable Integer meetingId,
+            Authentication authentication) {
+        try {
+            // Kiểm tra authentication
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Vui lòng đăng nhập để xem danh sách người được mời"));
+            }
+            
+            ApiResponse<List<InviteResponse>> response = meetingService.getMeetingInvitees(meetingId);
+            HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.NOT_FOUND;
+            return ResponseEntity.status(status).body(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi lấy danh sách người được mời: " + e.getMessage()));
+        }
+    }
+    
+    // Tải file ICS cho meeting
+    @GetMapping("/{meetingId}/download-ics")
+    public ResponseEntity<?> downloadIcs(
+            @PathVariable Integer meetingId,
+            Authentication authentication) {
+        try {
+            // Kiểm tra authentication
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Vui lòng đăng nhập để tải file lịch"));
+            }
+            
+            // Lấy meeting data
+            ApiResponse<MeetingResponse> meetingResponse = meetingService.getMeetingById(meetingId);
+            
+            if (!meetingResponse.isSuccess() || meetingResponse.getData() == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Không tìm thấy cuộc họp"));
+            }
+            
+            MeetingResponse meeting = meetingResponse.getData();
+            
+            // Generate ICS content
+            String icsContent = IcsGenerator.generateIcs(meeting);
+            
+            // Tạo filename
+            String filename = "meeting-" + meetingId;
+            if (meeting.getTitle() != null && !meeting.getTitle().isEmpty()) {
+                // Sanitize filename
+                filename = meeting.getTitle()
+                    .replaceAll("[^a-zA-Z0-9\\s-]", "")
+                    .replaceAll("\\s+", "-")
+                    .toLowerCase();
+                if (filename.length() > 50) {
+                    filename = filename.substring(0, 50);
+                }
+            }
+            filename += ".ics";
+            
+            // Set headers để download file
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("text/calendar; charset=utf-8"));
+            // Chỉ set Content-Disposition một lần
+            headers.setContentDispositionFormData("attachment", filename);
+            
+            return ResponseEntity.ok()
+                .headers(headers)
+                .body(icsContent);
+                
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi tạo file lịch: " + e.getMessage()));
+        }
     }
 }
 

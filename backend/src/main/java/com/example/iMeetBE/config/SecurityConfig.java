@@ -14,6 +14,8 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.example.iMeetBE.security.JwtAuthenticationFilter;
+import com.example.iMeetBE.security.RestAuthenticationEntryPoint;
+import com.example.iMeetBE.security.RestAccessDeniedHandler;
 import com.example.iMeetBE.service.CustomOAuth2UserService;
 import com.example.iMeetBE.service.CustomUserDetailsService;
 
@@ -32,6 +34,12 @@ public class SecurityConfig {
 
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
+
+    @Autowired
+    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+
+    @Autowired
+    private RestAccessDeniedHandler restAccessDeniedHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -72,6 +80,10 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(restAuthenticationEntryPoint)
+                .accessDeniedHandler(restAccessDeniedHandler)
+            )
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/oauth2/authorization/cognito")
                 .authorizationEndpoint(authorization -> authorization

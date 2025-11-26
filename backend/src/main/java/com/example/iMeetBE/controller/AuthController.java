@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.validation.Valid;
+
 import com.example.iMeetBE.dto.ChangePasswordRequest;
 import com.example.iMeetBE.dto.ChangePasswordResponse;
 import com.example.iMeetBE.dto.LoginRequest;
@@ -39,9 +41,17 @@ public class AuthController {
     private UserRepository userRepository;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         try {
-            LoginResponse response = authService.login(request.getEmail(), request.getPassword());
+            String usernameOrEmail = request.getUsernameOrEmail();
+            String password = request.getPassword();
+            
+            // Trim whitespace
+            if (usernameOrEmail != null) {
+                usernameOrEmail = usernameOrEmail.trim();
+            }
+            
+            LoginResponse response = authService.login(usernameOrEmail, password);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new LoginResponse(false, e.getMessage()));

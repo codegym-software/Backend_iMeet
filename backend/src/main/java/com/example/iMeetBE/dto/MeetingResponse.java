@@ -23,6 +23,7 @@ public class MeetingResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Long participants; // Số người được mời
+    private java.util.List<com.example.iMeetBE.dto.MeetingDeviceResponse> devices; // Danh sách thiết bị mượn
     
     // Constructors
     public MeetingResponse() {}
@@ -181,6 +182,14 @@ public class MeetingResponse {
     
     public void setParticipants(Long participants) {
         this.participants = participants;
+    }
+    
+    public java.util.List<com.example.iMeetBE.dto.MeetingDeviceResponse> getDevices() {
+        return devices;
+    }
+    
+    public void setDevices(java.util.List<com.example.iMeetBE.dto.MeetingDeviceResponse> devices) {
+        this.devices = devices;
     }
 }
 
