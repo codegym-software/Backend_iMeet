@@ -2,6 +2,7 @@ package com.example.iMeetBE.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import com.example.iMeetBE.model.BookingStatus;
 import com.example.iMeetBE.model.Meeting;
+import com.example.iMeetBE.model.SyncStatus;
 
 @Repository
 public interface MeetingRepository extends JpaRepository<Meeting, Integer> {
@@ -108,5 +110,11 @@ public interface MeetingRepository extends JpaRepository<Meeting, Integer> {
         @Param("startWindow") LocalDateTime startWindow, 
         @Param("endWindow") LocalDateTime endWindow
     );
+    
+    // Tìm các cuộc họp theo sync status
+    List<Meeting> findBySyncStatus(SyncStatus syncStatus);
+    
+    // Tìm meeting theo Google Event ID
+    Optional<Meeting> findByGoogleEventId(String googleEventId);
 }
 

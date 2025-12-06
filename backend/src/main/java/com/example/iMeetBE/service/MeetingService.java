@@ -231,6 +231,7 @@ public class MeetingService {
                 try {
                     googleCalendarService.syncMeetingToGoogleCalendar(savedMeeting.getMeetingId());
                 } catch (Exception e) {
+                    // GoogleCalendarService đã tự động set sync_status = UPDATE_PENDING khi lỗi
                     // Log lỗi nhưng không throw để không block việc tạo meeting
                     System.err.println("Warning: Failed to sync meeting to Google Calendar: " + e.getMessage());
                 }
@@ -484,7 +485,7 @@ public class MeetingService {
             
             Meeting updatedMeeting = meetingRepository.save(meeting);
             
-            // Đồng bộ với Google Calendar nếu user đã kết nối và meeting đã được sync trước đó
+            // Đồng bộ với Google Calendar nếu user đã kết nối
             if (googleCalendarService != null && updatedMeeting.getUser().getGoogleCalendarSyncEnabled() != null 
                 && updatedMeeting.getUser().getGoogleCalendarSyncEnabled()) {
                 try {
@@ -496,9 +497,13 @@ public class MeetingService {
                         googleCalendarService.syncMeetingToGoogleCalendar(updatedMeeting.getMeetingId());
                     }
                 } catch (Exception e) {
+                    // GoogleCalendarService đã tự động set sync_status = UPDATE_PENDING khi lỗi
                     // Log lỗi nhưng không throw để không block việc cập nhật meeting
                     System.err.println("Warning: Failed to sync meeting update to Google Calendar: " + e.getMessage());
                 }
+            } else {
+                // Nếu user chưa kết nối Google Calendar, set sync_status = null hoặc giữ nguyên
+                // Không cần làm gì vì sync_status mặc định là SYNCED
             }
             
             return ApiResponse.success(toMeetingResponse(updatedMeeting), 
@@ -534,13 +539,18 @@ public class MeetingService {
             
             // Xóa event khỏi Google Calendar nếu đã được sync
             if (googleCalendarService != null && meeting.getUser().getGoogleCalendarSyncEnabled() != null 
-                && meeting.getUser().getGoogleCalendarSyncEnabled() && meeting.getGoogleEventId() != null) {
+                && meeting.getUser().getGoogleCalendarSyncEnabled()) {
                 try {
                     googleCalendarService.deleteMeetingFromGoogleCalendar(meeting.getMeetingId());
                 } catch (Exception e) {
+                    // GoogleCalendarService đã tự động set sync_status = UPDATE_PENDING hoặc DELETED khi lỗi
                     // Log lỗi nhưng không throw để không block việc hủy meeting
                     System.err.println("Warning: Failed to delete meeting from Google Calendar: " + e.getMessage());
                 }
+            } else {
+                // Nếu user chưa kết nối Google Calendar, đánh dấu là DELETED
+                meeting.setSyncStatus(com.example.iMeetBE.model.SyncStatus.DELETED);
+                meetingRepository.save(meeting);
             }
             
             return ApiResponse.success(null, "Hủy cuộc họp thành công");

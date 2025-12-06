@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,10 +27,15 @@ import com.example.iMeetBE.model.User;
 import com.example.iMeetBE.repository.UserRepository;
 import com.example.iMeetBE.service.GoogleCalendarService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestController
 @RequestMapping("/api/auth/google/calendar")
 @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "https://imeeet.netlify.app"}, allowCredentials = "true")
 public class GoogleCalendarController {
+
+    private static final Logger logger = LoggerFactory.getLogger(GoogleCalendarController.class);
 
     @Autowired
     private GoogleCalendarService googleCalendarService;
@@ -278,6 +285,124 @@ public class GoogleCalendarController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("success", false, "error", "Lỗi không xác định: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Retry đồng bộ các meeting có sync_status = UPDATE_PENDING
+     */
+    @PostMapping("/retry-pending")
+    public ResponseEntity<Map<String, Object>> retryPendingSyncs(Authentication authentication) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("success", false, "error", "Vui lòng đăng nhập"));
+            }
+
+            int successCount = googleCalendarService.retryPendingSyncs();
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Đã retry đồng bộ các meeting pending",
+                "successCount", successCount
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("success", false, "error", "Lỗi khi retry: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Đồng bộ events từ Google Calendar về iMeet
+     * Lấy các events từ Google Calendar và tạo meetings trong iMeet
+     */
+    @PostMapping("/sync-from-google")
+    public ResponseEntity<Map<String, Object>> syncFromGoogleCalendar(
+            Authentication authentication,
+            @RequestParam(required = false) Integer daysAhead) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("success", false, "error", "Vui lòng đăng nhập"));
+            }
+
+            String email = authentication.getName();
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            if (!userOpt.isPresent()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("success", false, "error", "Không tìm thấy người dùng"));
+            }
+
+            User user = userOpt.get();
+            if (!user.getGoogleCalendarSyncEnabled()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("success", false, "error", "Bạn chưa kết nối Google Calendar"));
+            }
+
+            // Mặc định sync 7 ngày tới và 1 ngày trước
+            int days = daysAhead != null ? daysAhead : 7;
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            java.time.LocalDateTime startTime = now.minusDays(1);
+            java.time.LocalDateTime endTime = now.plusDays(days);
+
+            int syncedCount = googleCalendarService.syncFromGoogleCalendar(
+                user.getId(), 
+                startTime, 
+                endTime
+            );
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Đã đồng bộ events từ Google Calendar",
+                "syncedCount", syncedCount,
+                "timeRange", Map.of(
+                    "start", startTime.toString(),
+                    "end", endTime.toString()
+                )
+            ));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("success", false, "error", e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("success", false, "error", "Lỗi khi đồng bộ: " + e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("success", false, "error", "Lỗi không xác định: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Webhook endpoint để nhận notifications từ Google Calendar
+     * Google sẽ gửi POST request khi có thay đổi (thêm/sửa/xóa event)
+     */
+    @PostMapping("/webhook")
+    public ResponseEntity<String> handleWebhook(
+            @RequestHeader(value = "X-Goog-Channel-ID", required = false) String channelId,
+            @RequestHeader(value = "X-Goog-Resource-ID", required = false) String resourceId,
+            @RequestHeader(value = "X-Goog-Resource-State", required = false) String resourceState,
+            @RequestHeader(value = "X-Goog-Resource-URI", required = false) String resourceUri,
+            @RequestHeader(value = "X-Goog-Channel-Token", required = false) String channelToken,
+            @RequestBody(required = false) String body) {
+        try {
+            // Google Calendar gửi webhook với các headers đặc biệt
+            // X-Goog-Channel-ID: Channel ID đã đăng ký
+            // X-Goog-Resource-ID: Resource ID
+            // X-Goog-Resource-State: "sync" khi có thay đổi, "exists" khi channel mới tạo
+            // X-Goog-Resource-URI: URI của resource
+
+            logger.info("Received Google Calendar webhook: channelId={}, resourceId={}, state={}", 
+                channelId, resourceId, resourceState);
+
+            // Xử lý webhook
+            googleCalendarService.handleWebhook(channelId, resourceId, resourceState, resourceUri);
+
+            // Trả về 200 OK để Google biết đã nhận được
+            return ResponseEntity.ok("OK");
+        } catch (Exception e) {
+            logger.error("Error handling Google Calendar webhook: {}", e.getMessage(), e);
+            // Vẫn trả về 200 để Google không retry
+            return ResponseEntity.ok("Error: " + e.getMessage());
         }
     }
 }

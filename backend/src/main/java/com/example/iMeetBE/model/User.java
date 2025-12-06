@@ -48,6 +48,12 @@ public class User {
     @Column(name = "google_token_expiry")
     private LocalDateTime googleTokenExpiry;
 
+    @Column(name = "google_channel_id", length = 255)
+    private String googleChannelId; // Channel ID cho Google Calendar Watch API
+
+    @Column(name = "google_channel_resource_id", length = 255)
+    private String googleChannelResourceId; // Resource ID từ Google Calendar Watch
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private UserRole role = UserRole.USER;
@@ -167,6 +173,22 @@ public class User {
 
     public void setGoogleTokenExpiry(LocalDateTime googleTokenExpiry) {
         this.googleTokenExpiry = googleTokenExpiry;
+    }
+
+    public String getGoogleChannelId() {
+        return googleChannelId;
+    }
+
+    public void setGoogleChannelId(String googleChannelId) {
+        this.googleChannelId = googleChannelId;
+    }
+
+    public String getGoogleChannelResourceId() {
+        return googleChannelResourceId;
+    }
+
+    public void setGoogleChannelResourceId(String googleChannelResourceId) {
+        this.googleChannelResourceId = googleChannelResourceId;
     }
 
     public UserRole getRole() {

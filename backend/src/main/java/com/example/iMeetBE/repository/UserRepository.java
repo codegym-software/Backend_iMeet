@@ -1,5 +1,6 @@
 package com.example.iMeetBE.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,4 +29,10 @@ public interface UserRepository extends JpaRepository<User, String> {
         @Param("search") String search, 
         @Param("search") String search2, 
         org.springframework.data.domain.Pageable pageable);
+    
+    // Find users with Google Calendar sync enabled
+    List<User> findByGoogleCalendarSyncEnabledTrue();
+    
+    // Find user by Google Channel ID
+    Optional<User> findByGoogleChannelId(String googleChannelId);
 }

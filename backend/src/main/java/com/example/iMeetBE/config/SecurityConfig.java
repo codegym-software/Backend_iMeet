@@ -70,6 +70,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/room-devices/**").permitAll() // Cho phép test API devices mà không cần authentication
                 .requestMatchers("/api/oauth2/**").permitAll()
                 .requestMatchers("/api/auth/google/calendar/callback").permitAll()
+                .requestMatchers("/api/auth/google/calendar/webhook").permitAll() // Webhook từ Google không cần auth
                 .requestMatchers("/api/auth/google/calendar/**").authenticated()
                 .requestMatchers("/api/cognito/**").hasRole("ADMIN")
                 .requestMatchers("/api/test/**").permitAll()

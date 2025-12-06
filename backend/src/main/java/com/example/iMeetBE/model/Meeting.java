@@ -64,6 +64,10 @@ public class Meeting {
     @Column(name = "google_event_id")
     private String googleEventId; // ID của event trên Google Calendar
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sync_status")
+    private SyncStatus syncStatus = SyncStatus.SYNCED; // Trạng thái đồng bộ với Google Calendar
+    
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -192,6 +196,14 @@ public class Meeting {
     
     public void setGoogleEventId(String googleEventId) {
         this.googleEventId = googleEventId;
+    }
+    
+    public SyncStatus getSyncStatus() {
+        return syncStatus;
+    }
+    
+    public void setSyncStatus(SyncStatus syncStatus) {
+        this.syncStatus = syncStatus;
     }
 }
 

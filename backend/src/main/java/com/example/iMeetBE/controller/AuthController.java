@@ -143,18 +143,35 @@ public class AuthController {
     }
 
     @GetMapping("/check-auth")
-    public ResponseEntity<?> checkAuth(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<?> checkAuth(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
-            // Lấy token từ header
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                return ResponseEntity.status(401).body(Map.of("authenticated", false, "message", "Token không hợp lệ"));
+            // Kiểm tra nếu không có Authorization header
+            if (authHeader == null || authHeader.isEmpty() || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.ok(Map.of(
+                    "authenticated", false, 
+                    "message", "Không có token",
+                    "valid", false
+                ));
             }
             
             String token = authHeader.substring(7);
             
+            // Kiểm tra token có rỗng không
+            if (token == null || token.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                    "authenticated", false, 
+                    "message", "Token rỗng",
+                    "valid", false
+                ));
+            }
+            
             // Validate token từ database
             if (!authService.validateTokenFromDatabase(token)) {
-                return ResponseEntity.status(401).body(Map.of("authenticated", false, "message", "Token không hợp lệ hoặc đã hết hạn"));
+                return ResponseEntity.ok(Map.of(
+                    "authenticated", false, 
+                    "message", "Token không hợp lệ hoặc đã hết hạn",
+                    "valid", false
+                ));
             }
             
             // Lấy user từ token
@@ -162,16 +179,22 @@ public class AuthController {
             
             return ResponseEntity.ok(Map.of(
                 "authenticated", true,
+                "valid", true,
                 "email", user.getEmail(),
                 "username", user.getUsername(),
-                "fullName", user.getFullName(),
+                "fullName", user.getFullName() != null ? user.getFullName() : "",
                 "userId", user.getId(),
                 "role", user.getRole().name(),
                 "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : "",
                 "accessToken", user.getAccessToken() != null ? "exists" : "null"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(401).body(Map.of("authenticated", false, "message", e.getMessage()));
+            // Trả về 200 với authenticated = false thay vì 401 để frontend có thể xử lý
+            return ResponseEntity.ok(Map.of(
+                "authenticated", false, 
+                "valid", false,
+                "message", e.getMessage() != null ? e.getMessage() : "Lỗi xác thực"
+            ));
         }
     }
 

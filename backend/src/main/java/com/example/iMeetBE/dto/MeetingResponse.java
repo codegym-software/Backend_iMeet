@@ -24,6 +24,8 @@ public class MeetingResponse {
     private LocalDateTime updatedAt;
     private Long participants; // Số người được mời
     private java.util.List<com.example.iMeetBE.dto.MeetingDeviceResponse> devices; // Danh sách thiết bị mượn
+    private String googleEventId; // ID của event trên Google Calendar
+    private String syncStatus; // Trạng thái đồng bộ với Google Calendar
     
     // Constructors
     public MeetingResponse() {}
@@ -53,6 +55,8 @@ public class MeetingResponse {
         this.bookingStatus = meeting.getBookingStatus();
         this.createdAt = meeting.getCreatedAt();
         this.updatedAt = meeting.getUpdatedAt();
+        this.googleEventId = meeting.getGoogleEventId();
+        this.syncStatus = meeting.getSyncStatus() != null ? meeting.getSyncStatus().name() : null;
     }
     
     // Getters and Setters
@@ -190,6 +194,22 @@ public class MeetingResponse {
     
     public void setDevices(java.util.List<com.example.iMeetBE.dto.MeetingDeviceResponse> devices) {
         this.devices = devices;
+    }
+    
+    public String getGoogleEventId() {
+        return googleEventId;
+    }
+    
+    public void setGoogleEventId(String googleEventId) {
+        this.googleEventId = googleEventId;
+    }
+    
+    public String getSyncStatus() {
+        return syncStatus;
+    }
+    
+    public void setSyncStatus(String syncStatus) {
+        this.syncStatus = syncStatus;
     }
 }
 
