@@ -91,4 +91,3 @@ logs/
 # Allow specific JAR file
 !target/iMeet.jar
 
-util/
