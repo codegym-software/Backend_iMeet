@@ -41,7 +41,7 @@ public class Meeting {
     private Boolean isAllDay = false;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_id", nullable = false)
+    @JoinColumn(name = "room_id", nullable = true)
     private Room room;
     
     @ManyToOne(fetch = FetchType.LAZY)

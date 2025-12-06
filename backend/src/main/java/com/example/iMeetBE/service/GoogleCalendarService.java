@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,9 +26,11 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeToken
 import com.google.api.client.googleapis.auth.oauth2.GoogleRefreshTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpResponseException;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.DateTime;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.Channel;
@@ -40,7 +44,6 @@ import com.example.iMeetBE.model.Room;
 import com.example.iMeetBE.model.SyncStatus;
 import com.example.iMeetBE.model.User;
 
-import java.util.List;
 import com.example.iMeetBE.repository.MeetingRepository;
 import com.example.iMeetBE.repository.RoomRepository;
 import com.example.iMeetBE.repository.UserRepository;
@@ -48,11 +51,17 @@ import com.example.iMeetBE.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
 @Service
 @Transactional
 public class GoogleCalendarService {
 
     private static final Logger logger = LoggerFactory.getLogger(GoogleCalendarService.class);
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Autowired
     private UserRepository userRepository;
@@ -79,6 +88,9 @@ public class GoogleCalendarService {
     private static final GsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private static final List<String> SCOPES = Collections.singletonList(CalendarScopes.CALENDAR);
 
+    // Locks to avoid concurrent refresh token calls for the same user
+    private final ConcurrentHashMap<String, Object> refreshLocks = new ConcurrentHashMap<>();
+
     /**
      * Tạo authorization URL để người dùng kết nối Google Calendar
      */
@@ -93,7 +105,7 @@ public class GoogleCalendarService {
             GoogleAuthorizationCodeRequestUrl url = flow.newAuthorizationUrl()
                     .setRedirectUri(redirectUri)
                     .setState(state)
-                    .set("prompt", "consent");
+                    .set("prompt", "consent"); // force consent to ensure refresh_token is returned
 
             return url.build();
         } catch (Exception e) {
@@ -127,11 +139,12 @@ public class GoogleCalendarService {
 
             // Lưu tokens vào user
             user.setAccessToken(tokenResponse.getAccessToken());
-            user.setGoogleRefreshToken(tokenResponse.getRefreshToken());
-            
-            // Tính toán thời gian hết hạn token (thường là 3600 giây)
-            long expiresIn = tokenResponse.getExpiresInSeconds() != null 
-                    ? tokenResponse.getExpiresInSeconds() 
+            // Note: Google returns refresh_token only on first consent or when prompt=consent used
+            if (tokenResponse.getRefreshToken() != null) {
+                user.setGoogleRefreshToken(tokenResponse.getRefreshToken());
+            }
+            long expiresIn = tokenResponse.getExpiresInSeconds() != null
+                    ? tokenResponse.getExpiresInSeconds()
                     : 3600L;
             user.setGoogleTokenExpiry(LocalDateTime.now().plusSeconds(expiresIn));
             user.setGoogleCalendarSyncEnabled(true);
@@ -143,7 +156,7 @@ public class GoogleCalendarService {
             try {
                 subscribeWatch(user);
             } catch (Exception e) {
-                logger.warn("Failed to subscribe watch for user {}: {}", userId, e.getMessage());
+                logger.warn("Failed to subscribe watch for user {}: {}", user.getId(), e.getMessage());
                 // Không throw error để không block việc kết nối calendar
             }
 
@@ -158,13 +171,15 @@ public class GoogleCalendarService {
      */
     private Credential getCredentials(User user) throws IOException {
         if (user.getGoogleRefreshToken() == null || user.getGoogleRefreshToken().isEmpty()) {
-            throw new IllegalStateException("User does not have Google Calendar connected");
+            throw new IllegalStateException("User does not have Google Calendar connected (no refresh token)");
         }
 
-        // Kiểm tra và refresh token nếu cần
-        if (user.getGoogleTokenExpiry() == null || 
-            LocalDateTime.now().isAfter(user.getGoogleTokenExpiry().minusMinutes(5))) {
-            refreshAccessToken(user);
+        // Nếu token sắp hết hạn hoặc null, refresh
+        if (user.getGoogleTokenExpiry() == null || LocalDateTime.now().isAfter(user.getGoogleTokenExpiry().minusMinutes(5L))) {
+            // ensure refresh happens under lock to avoid multiple refresh in parallel
+            refreshAccessTokenWithLock(user);
+            // reload user after refresh
+            user = userRepository.findById(user.getId()).orElse(user);
         }
 
         GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
@@ -186,34 +201,70 @@ public class GoogleCalendarService {
     }
 
     /**
-     * Refresh access token khi hết hạn
+     * Refresh access token khi hết hạn — có lock để tránh race condition
      */
+    private void refreshAccessTokenWithLock(User user) throws IOException {
+        Object lock = refreshLocks.computeIfAbsent(user.getId(), k -> new Object());
+        synchronized (lock) {
+            // reload user inside lock to check if another thread already refreshed
+            User fresh = userRepository.findById(user.getId()).orElse(user);
+            if (fresh.getGoogleTokenExpiry() != null &&
+                LocalDateTime.now().isBefore(fresh.getGoogleTokenExpiry().minusMinutes(5L))) {
+                // someone else refreshed already
+                logger.debug("Token already refreshed by another thread for user {}", user.getId());
+                return;
+            }
+            // perform actual refresh
+            refreshAccessToken(fresh);
+        }
+        // cleanup lock map to prevent memory leak (best-effort)
+        refreshLocks.remove(user.getId());
+    }
+
     private void refreshAccessToken(User user) throws IOException {
         try {
             logger.info("Refreshing access token for user {}", user.getId());
+
+            if (user.getGoogleRefreshToken() == null || user.getGoogleRefreshToken().isEmpty()) {
+                throw new IOException("No refresh token available for user " + user.getId());
+            }
+
             GoogleRefreshTokenRequest refreshRequest = new GoogleRefreshTokenRequest(
                     HTTP_TRANSPORT, JSON_FACTORY, user.getGoogleRefreshToken(), clientId, clientSecret);
 
             GoogleTokenResponse tokenResponse = refreshRequest.execute();
 
             user.setAccessToken(tokenResponse.getAccessToken());
-            long expiresIn = tokenResponse.getExpiresInSeconds() != null 
-                    ? tokenResponse.getExpiresInSeconds() 
+            long expiresIn = tokenResponse.getExpiresInSeconds() != null
+                    ? tokenResponse.getExpiresInSeconds()
                     : 3600L;
             user.setGoogleTokenExpiry(LocalDateTime.now().plusSeconds(expiresIn));
             user.setUpdatedAt(LocalDateTime.now());
 
             userRepository.save(user);
             logger.info("Successfully refreshed access token for user {}", user.getId());
+        } catch (HttpResponseException e) {
+            logger.error("HTTP error during refresh for user {}: {} - {}", user.getId(), e.getStatusCode(), e.getStatusMessage(), e);
+            handleInvalidRefreshToken(user, e);
+            throw new IOException("Failed to refresh access token. Calendar sync disabled for user " + user.getId(), e);
         } catch (Exception e) {
             logger.error("Failed to refresh access token for user {}: {}", user.getId(), e.getMessage(), e);
-            // Nếu refresh token không hợp lệ, ngắt kết nối
+            handleInvalidRefreshToken(user, e);
+            throw new IOException("Failed to refresh access token. Calendar sync disabled for user " + user.getId(), e);
+        }
+    }
+
+    private void handleInvalidRefreshToken(User user, Exception e) {
+        // If refresh fails (invalid refresh token or revoked), disable sync and clear tokens
+        try {
+            logger.warn("Disabling Google Calendar sync for user {} due to refresh failure: {}", user.getId(), e.getMessage());
             user.setGoogleCalendarSyncEnabled(false);
             user.setGoogleRefreshToken(null);
             user.setAccessToken(null);
             user.setGoogleTokenExpiry(null);
             userRepository.save(user);
-            throw new IOException("Failed to refresh access token. Calendar sync disabled.", e);
+        } catch (Exception ex) {
+            logger.error("Error disabling calendar sync for user {}: {}", user.getId(), ex.getMessage(), ex);
         }
     }
 
@@ -239,20 +290,21 @@ public class GoogleCalendarService {
         Meeting meeting = meetingOpt.get();
         User user = meeting.getUser();
 
-        if (!user.getGoogleCalendarSyncEnabled()) {
-            logger.warn("User {} has not connected Google Calendar for meeting {}", user.getId(), meetingId);
+        if (user == null || !Boolean.TRUE.equals(user.getGoogleCalendarSyncEnabled())) {
+            logger.warn("User {} has not connected Google Calendar for meeting {}", user != null ? user.getId() : "null", meetingId);
             throw new IllegalStateException("User has not connected Google Calendar");
         }
 
         try {
             logger.info("Starting Google Calendar sync for meeting {} (user: {})", meetingId, user.getId());
-            Calendar calendarService = getCalendarService(user);
 
             // Tạo Google Calendar Event từ Meeting
             Event event = createEventFromMeeting(meeting);
 
-            // Tạo event trên Google Calendar
-            Event createdEvent = calendarService.events().insert("primary", event).execute();
+            // Tạo event trên Google Calendar với retry logic
+            Event createdEvent = executeWithRetry(user, calendarService ->
+                calendarService.events().insert("primary", event).execute()
+            );
 
             // Lưu Google Event ID và cập nhật sync status
             meeting.setGoogleEventId(createdEvent.getId());
@@ -287,8 +339,8 @@ public class GoogleCalendarService {
         Meeting meeting = meetingOpt.get();
         User user = meeting.getUser();
 
-        if (!user.getGoogleCalendarSyncEnabled()) {
-            logger.warn("User {} has not connected Google Calendar for meeting update {}", user.getId(), meetingId);
+        if (user == null || !Boolean.TRUE.equals(user.getGoogleCalendarSyncEnabled())) {
+            logger.warn("User {} has not connected Google Calendar for meeting update {}", user != null ? user.getId() : "null", meetingId);
             throw new IllegalStateException("User has not connected Google Calendar");
         }
 
@@ -299,24 +351,27 @@ public class GoogleCalendarService {
         }
 
         try {
-            logger.info("Updating Google Calendar event for meeting {} (Event ID: {}, user: {})", 
+            logger.info("Updating Google Calendar event for meeting {} (Event ID: {}, user: {})",
                 meetingId, meeting.getGoogleEventId(), user.getId());
-            Calendar calendarService = getCalendarService(user);
 
-            // Lấy event hiện tại
-            Event existingEvent = calendarService.events().get("primary", meeting.getGoogleEventId()).execute();
+            // Lấy event hiện tại với retry logic
+            Event existingEvent = executeWithRetry(user, calendarService ->
+                calendarService.events().get("primary", meeting.getGoogleEventId()).execute()
+            );
 
             // Cập nhật thông tin event
             Event updatedEvent = updateEventFromMeeting(existingEvent, meeting);
 
-            // Cập nhật event trên Google Calendar
-            Event savedEvent = calendarService.events().update("primary", meeting.getGoogleEventId(), updatedEvent).execute();
+            // Cập nhật event trên Google Calendar với retry logic
+            Event savedEvent = executeWithRetry(user, calendarService ->
+                calendarService.events().update("primary", meeting.getGoogleEventId(), updatedEvent).execute()
+            );
 
             // Cập nhật sync status thành công
             meeting.setSyncStatus(SyncStatus.SYNCED);
             meetingRepository.save(meeting);
 
-            logger.info("Successfully updated Google Calendar event for meeting {}. Event ID: {}", 
+            logger.info("Successfully updated Google Calendar event for meeting {}. Event ID: {}",
                 meetingId, savedEvent.getId());
             return savedEvent;
         } catch (IOException e) {
@@ -353,24 +408,28 @@ public class GoogleCalendarService {
             return;
         }
 
-        if (!user.getGoogleCalendarSyncEnabled()) {
-            logger.info("User {} has not connected Google Calendar, skipping deletion for meeting {}", 
-                user.getId(), meetingId);
+        if (user == null || !Boolean.TRUE.equals(user.getGoogleCalendarSyncEnabled())) {
+            logger.info("User {} has not connected Google Calendar, skipping deletion for meeting {}",
+                user != null ? user.getId() : "null", meetingId);
             meeting.setSyncStatus(SyncStatus.DELETED);
             meetingRepository.save(meeting);
             return;
         }
 
         try {
-            logger.info("Deleting Google Calendar event for meeting {} (Event ID: {}, user: {})", 
+            logger.info("Deleting Google Calendar event for meeting {} (Event ID: {}, user: {})",
                 meetingId, meeting.getGoogleEventId(), user.getId());
-            Calendar calendarService = getCalendarService(user);
-            calendarService.events().delete("primary", meeting.getGoogleEventId()).execute();
-            
+
+            // Xóa event với retry logic
+            executeWithRetry(user, calendarService -> {
+                calendarService.events().delete("primary", meeting.getGoogleEventId()).execute();
+                return null;
+            });
+
             // Cập nhật sync status thành deleted
             meeting.setSyncStatus(SyncStatus.DELETED);
             meetingRepository.save(meeting);
-            
+
             logger.info("Successfully deleted Google Calendar event for meeting {}", meetingId);
         } catch (IOException e) {
             logger.error("Failed to delete Google Calendar event for meeting {}: {}", meetingId, e.getMessage(), e);
@@ -403,15 +462,34 @@ public class GoogleCalendarService {
         }
         User user = userOpt.get();
 
-        // Revoke token trên Google
-        if (user.getAccessToken() != null) {
-            try {
-                String revokeUrl = "https://oauth2.googleapis.com/revoke?token=" + user.getAccessToken();
-                HTTP_TRANSPORT.createRequestFactory().buildGetRequest(
-                    new com.google.api.client.http.GenericUrl(revokeUrl)).execute();
-            } catch (Exception e) {
-                System.err.println("Error revoking Google token: " + e.getMessage());
+        // Xóa các meetings được sync từ Google Calendar (có google_event_id)
+        try {
+            List<Meeting> syncedMeetings = meetingRepository.findByUserId(user.getId());
+            int deletedCount = 0;
+            for (Meeting meeting : syncedMeetings) {
+                if (meeting.getGoogleEventId() != null && !meeting.getGoogleEventId().isEmpty()) {
+                    // Đây là meeting được sync từ Google Calendar, xóa khỏi iMeet
+                    meetingRepository.delete(meeting);
+                    deletedCount++;
+                    logger.info("Deleted synced meeting {} (Google Event ID: {}) for user {}", 
+                        meeting.getMeetingId(), meeting.getGoogleEventId(), user.getId());
+                }
             }
+            logger.info("Deleted {} synced meetings from Google Calendar for user {}", deletedCount, user.getId());
+        } catch (Exception e) {
+            logger.error("Error deleting synced meetings for user {}: {}", user.getId(), e.getMessage(), e);
+        }
+
+        // Revoke token trên Google
+        try {
+            String token = user.getAccessToken() != null ? user.getAccessToken() : user.getGoogleRefreshToken();
+            if (token != null) {
+                String revokeUrl = "https://oauth2.googleapis.com/revoke?token=" + token;
+                HTTP_TRANSPORT.createRequestFactory().buildGetRequest(
+                    new GenericUrl(revokeUrl)).execute();
+            }
+        } catch (Exception e) {
+            logger.warn("Error revoking Google token for user {}: {}", user.getId(), e.getMessage());
         }
 
         // Stop watch nếu có
@@ -512,7 +590,7 @@ public class GoogleCalendarService {
         for (Meeting meeting : pendingMeetings) {
             try {
                 User user = meeting.getUser();
-                if (user == null || !user.getGoogleCalendarSyncEnabled()) {
+                if (user == null || !Boolean.TRUE.equals(user.getGoogleCalendarSyncEnabled())) {
                     logger.warn("Skipping meeting {} - user not connected to Google Calendar", meeting.getMeetingId());
                     continue;
                 }
@@ -539,36 +617,176 @@ public class GoogleCalendarService {
     }
 
     /**
+     * Lấy hoặc tạo default room cho Google Calendar sync
+     */
+    private Room getOrCreateDefaultRoom() {
+        String defaultRoomName = "Google Calendar - Unassigned";
+        Optional<Room> defaultRoom = roomRepository.findByName(defaultRoomName);
+        
+        if (defaultRoom.isPresent()) {
+            return defaultRoom.get();
+        }
+        
+        // Tạo default room nếu chưa tồn tại
+        Room newDefaultRoom = new Room();
+        newDefaultRoom.setName(defaultRoomName);
+        newDefaultRoom.setLocation("Virtual/Online");
+        newDefaultRoom.setCapacity(100);
+        newDefaultRoom.setDescription("Default room for Google Calendar events without location");
+        
+        try {
+            return roomRepository.save(newDefaultRoom);
+        } catch (Exception e) {
+            logger.error("Failed to create default room: {}", e.getMessage(), e);
+            // Nếu không tạo được, lấy room bất kỳ đầu tiên
+            List<Room> allRooms = roomRepository.findAll();
+            if (!allRooms.isEmpty()) {
+                return allRooms.get(0);
+            }
+            throw new RuntimeException("No rooms available in the system");
+        }
+    }
+
+    /**
      * Map location từ Google Calendar event sang Room trong iMeet
      * Tìm room theo tên hoặc location
      */
     private Room mapLocationToRoom(String location) {
-        if (location == null || location.isEmpty()) {
+        if (location == null || location.trim().isEmpty()) {
             return null;
         }
 
-        // Thử tìm room theo tên chính xác
-        Optional<Room> roomByName = roomRepository.findByName(location.trim());
-        if (roomByName.isPresent()) {
-            return roomByName.get();
+        String trimmed = location.trim();
+
+        // 1) Try exact name match
+        Optional<Room> byName = roomRepository.findByName(trimmed);
+        if (byName.isPresent()) {
+            return byName.get();
         }
 
-        // Thử tìm room theo location
-        List<Room> roomsByLocation = roomRepository.findByNameContainingIgnoreCaseOrLocationContainingIgnoreCase(location.trim());
-        if (!roomsByLocation.isEmpty()) {
-            // Ưu tiên room có location khớp chính xác
-            for (Room room : roomsByLocation) {
-                if (room.getLocation() != null && room.getLocation().equalsIgnoreCase(location.trim())) {
-                    return room;
+        // 2) Try contains (name or location) using your repository query
+        List<Room> candidates = roomRepository.findByNameContainingIgnoreCaseOrLocationContainingIgnoreCase(trimmed);
+        if (candidates != null && !candidates.isEmpty()) {
+            // Choose the best candidate:
+            // - Prefer exact location match
+            for (Room r : candidates) {
+                if (r.getLocation() != null && r.getLocation().equalsIgnoreCase(trimmed)) {
+                    return r;
                 }
             }
-            // Nếu không có location khớp chính xác, trả về room đầu tiên
-            return roomsByLocation.get(0);
+            // - Prefer candidate with name equalsIgnoreCase
+            for (Room r : candidates) {
+                if (r.getName() != null && r.getName().equalsIgnoreCase(trimmed)) {
+                    return r;
+                }
+            }
+            // - Otherwise return first candidate (ordered by repository default)
+            return candidates.get(0);
         }
 
-        // Không tìm thấy room, trả về null
+        // 3) Fallback: try splitting common separators and match
+        String fallback = trimmed;
+        if (trimmed.contains(",")) {
+            String firstPart = trimmed.split(",")[0].trim();
+            Optional<Room> byFirstPart = roomRepository.findByName(firstPart);
+            if (byFirstPart.isPresent()) return byFirstPart.get();
+        }
+
         logger.warn("Could not find room for location: {}", location);
         return null;
+    }
+
+    /**
+     * Helper method để thực thi Google Calendar API call với retry logic khi gặp lỗi 401
+     */
+    @FunctionalInterface
+    private interface CalendarApiCall<T> {
+        T execute(Calendar calendarService) throws IOException;
+    }
+
+    /**
+     * Thực thi Google Calendar API call với retry logic khi gặp lỗi 401
+     * Retry strategy:
+     * - Try once
+     * - If 401 -> refresh token (under lock) -> retry once
+     * - If still fails -> propagate exception
+     */
+    private <T> T executeWithRetry(User user, CalendarApiCall<T> apiCall) throws IOException {
+        int attempts = 0;
+        int maxAttempts = 2;
+        long baseBackoffMs = 300L; // small backoff on retry
+
+        while (true) {
+            attempts++;
+            Calendar calendarService = getCalendarService(user);
+            try {
+                return apiCall.execute(calendarService);
+            } catch (GoogleJsonResponseException e) {
+                int status = e.getStatusCode();
+                logger.debug("GoogleJsonResponseException (status {}) for user {} on attempt {}/{}: {}",
+                    status, user.getId(), attempts, maxAttempts, e.getMessage());
+                if (status == 401 && attempts < maxAttempts) {
+                    // refresh token and retry
+                    logger.warn("Received 401 from Google API for user {} — attempting token refresh and retry", user.getId());
+                    try {
+                        refreshAccessTokenWithLock(user);
+                        user = userRepository.findById(user.getId()).orElse(user);
+                    } catch (IOException ex) {
+                        logger.error("Failed to refresh token for user {}: {}", user.getId(), ex.getMessage(), ex);
+                        throw new IOException("Failed to refresh Google token", ex);
+                    }
+
+                    // backoff a bit
+                    try {
+                        TimeUnit.MILLISECONDS.sleep(baseBackoffMs * attempts);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    continue; // retry
+                }
+                // not recoverable or max attempts reached
+                throw new IOException("Google Calendar API error: " + e.getMessage(), e);
+            } catch (HttpResponseException hre) {
+                // non-json errors, try similar logic for 401
+                if (hre.getStatusCode() == 401 && attempts < maxAttempts) {
+                    logger.warn("HTTP 401 for user {}, trying refresh and retry", user.getId());
+                    try {
+                        refreshAccessTokenWithLock(user);
+                        user = userRepository.findById(user.getId()).orElse(user);
+                    } catch (IOException ex) {
+                        logger.error("Failed to refresh token for user {}: {}", user.getId(), ex.getMessage(), ex);
+                        throw new IOException("Failed to refresh Google token", ex);
+                    }
+                    try {
+                        TimeUnit.MILLISECONDS.sleep(baseBackoffMs * attempts);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    continue;
+                }
+                throw new IOException("HTTP error calling Google Calendar API: " + hre.getMessage(), hre);
+            } catch (IOException e) {
+                // network error or other IO
+                logger.error("IOException calling Google Calendar API for user {}: {}", user.getId(), e.getMessage(), e);
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Lấy events từ Google Calendar với retry logic khi gặp lỗi 401
+     */
+    private Events fetchEventsWithRetry(User user, com.google.api.client.util.DateTime timeMin,
+                                        com.google.api.client.util.DateTime timeMax) throws IOException {
+        return executeWithRetry(user, calendarService ->
+            calendarService.events()
+                .list("primary")
+                .setTimeMin(timeMin)
+                .setTimeMax(timeMax)
+                .setOrderBy("startTime")
+                .setSingleEvents(true)
+                .execute()
+        );
     }
 
     /**
@@ -584,14 +802,13 @@ public class GoogleCalendarService {
         }
 
         User user = userOpt.get();
-        if (!user.getGoogleCalendarSyncEnabled()) {
+        if (!Boolean.TRUE.equals(user.getGoogleCalendarSyncEnabled())) {
             logger.warn("User {} has not connected Google Calendar", userId);
             throw new IllegalStateException("User has not connected Google Calendar");
         }
 
         try {
             logger.info("Starting sync from Google Calendar for user {} (from {} to {})", userId, startTime, endTime);
-            Calendar calendarService = getCalendarService(user);
 
             // Lấy events từ Google Calendar trong khoảng thời gian
             com.google.api.client.util.DateTime timeMin = new com.google.api.client.util.DateTime(
@@ -601,13 +818,8 @@ public class GoogleCalendarService {
                 endTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             );
 
-            Events events = calendarService.events()
-                .list("primary")
-                .setTimeMin(timeMin)
-                .setTimeMax(timeMax)
-                .setOrderBy("startTime")
-                .setSingleEvents(true)
-                .execute();
+            // Lấy events với retry logic khi gặp lỗi 401
+            Events events = fetchEventsWithRetry(user, timeMin, timeMax);
 
             List<Event> items = events.getItems();
             if (items == null || items.isEmpty()) {
@@ -622,7 +834,7 @@ public class GoogleCalendarService {
             // Lấy danh sách tất cả Google Event IDs từ events
             Set<String> googleEventIds = new HashSet<>();
             for (Event event : items) {
-                if (event.getId() != null && !event.getStatus().equals("cancelled")) {
+                if (event.getId() != null && (event.getStatus() == null || !event.getStatus().equals("cancelled"))) {
                     googleEventIds.add(event.getId());
                 }
             }
@@ -638,7 +850,7 @@ public class GoogleCalendarService {
                             meeting.setBookingStatus(BookingStatus.CANCELLED);
                             meeting.setSyncStatus(SyncStatus.DELETED);
                             meetingRepository.save(meeting);
-                            logger.info("Marked meeting {} as CANCELLED (event {} deleted from Google Calendar)", 
+                            logger.info("Marked meeting {} as CANCELLED (event {} deleted from Google Calendar)",
                                 meeting.getMeetingId(), meeting.getGoogleEventId());
                         }
                     }
@@ -658,7 +870,7 @@ public class GoogleCalendarService {
                                 meeting.setBookingStatus(BookingStatus.CANCELLED);
                                 meeting.setSyncStatus(SyncStatus.DELETED);
                                 meetingRepository.save(meeting);
-                                logger.info("Marked meeting {} as CANCELLED (event {} cancelled on Google Calendar)", 
+                                logger.info("Marked meeting {} as CANCELLED (event {} cancelled on Google Calendar)",
                                     meeting.getMeetingId(), event.getId());
                             }
                         }
@@ -671,35 +883,55 @@ public class GoogleCalendarService {
                     if (existingMeeting.isPresent()) {
                         // Meeting đã tồn tại, cập nhật thông tin
                         Meeting meeting = existingMeeting.get();
-                        
-                        // Nếu meeting đã bị CANCELLED nhưng event lại active, restore lại
-                        if (meeting.getBookingStatus() == BookingStatus.CANCELLED) {
-                            meeting.setBookingStatus(BookingStatus.BOOKED);
+
+                        try {
+                            // Nếu meeting đã bị CANCELLED nhưng event lại active, restore lại
+                            if (meeting.getBookingStatus() == BookingStatus.CANCELLED) {
+                                meeting.setBookingStatus(BookingStatus.BOOKED);
+                            }
+
+                            updateMeetingFromGoogleEvent(meeting, event);
+                            meetingRepository.save(meeting);
+                            updatedCount++;
+                            logger.info("Updated meeting {} from Google Calendar event {}", meeting.getMeetingId(), event.getId());
+                        } catch (Exception updateException) {
+                            // Clear entity manager to avoid "null id" error on next query
+                            entityManager.clear();
+                            logger.error("Error updating meeting {} from Google Calendar event {}: {}", 
+                                meeting.getMeetingId(), event.getId(), updateException.getMessage(), updateException);
+                            skippedCount++;
                         }
-                        
-                        updateMeetingFromGoogleEvent(meeting, event);
-                        meetingRepository.save(meeting);
-                        updatedCount++;
-                        logger.info("Updated meeting {} from Google Calendar event {}", meeting.getMeetingId(), event.getId());
                     } else {
                         // Tạo meeting mới từ Google Calendar event
                         Meeting meeting = createMeetingFromGoogleEvent(user, event);
                         if (meeting != null) {
-                            meetingRepository.save(meeting);
-                            createdCount++;
-                            logger.info("Created meeting {} from Google Calendar event {}", meeting.getMeetingId(), event.getId());
+                            try {
+                                meetingRepository.save(meeting);
+                                createdCount++;
+                                String roomInfo = meeting.getRoom() != null ? "in room " + meeting.getRoom().getName() : "without room";
+                                logger.info("Created meeting {} from Google Calendar event {} {}", 
+                                    meeting.getMeetingId(), event.getId(), roomInfo);
+                            } catch (Exception saveException) {
+                                // Clear entity manager to avoid "null id" error on next query
+                                entityManager.clear();
+                                logger.error("Error saving meeting from Google Calendar event {}: {}", 
+                                    event.getId(), saveException.getMessage(), saveException);
+                                skippedCount++;
+                            }
                         } else {
                             skippedCount++;
-                            logger.warn("Skipped creating meeting from Google Calendar event {} (no room found)", event.getId());
+                            logger.debug("Skipped creating meeting from Google Calendar event {}", event.getId());
                         }
                     }
                 } catch (Exception e) {
+                    // Clear entity manager to avoid "null id" error on next query
+                    entityManager.clear();
                     logger.error("Error processing Google Calendar event {}: {}", event.getId(), e.getMessage(), e);
                     skippedCount++;
                 }
             }
 
-            logger.info("Sync from Google Calendar completed. Created: {}, Updated: {}, Skipped: {}", 
+            logger.info("Sync from Google Calendar completed. Created: {}, Updated: {}, Skipped: {}",
                 createdCount, updatedCount, skippedCount);
             return createdCount + updatedCount;
         } catch (IOException e) {
@@ -755,10 +987,10 @@ public class GoogleCalendarService {
             // Map location từ Google Calendar event sang Room
             Room room = mapLocationToRoom(event.getLocation());
             if (room == null) {
-                // Không tìm thấy room, không thể tạo meeting (vì room là bắt buộc)
-                logger.warn("Could not find room for Google Calendar event {} with location: {}", 
+                // Không tìm thấy room, sử dụng default room
+                logger.info("Google Calendar event {} has no matching room (location: {}), using default room",
                     event.getId(), event.getLocation());
-                return null;
+                room = getOrCreateDefaultRoom();
             }
 
             // Tạo meeting mới
@@ -827,7 +1059,7 @@ public class GoogleCalendarService {
             // Cập nhật room nếu location thay đổi
             if (event.getLocation() != null && !event.getLocation().isEmpty()) {
                 Room newRoom = mapLocationToRoom(event.getLocation());
-                if (newRoom != null && !newRoom.getRoomId().equals(meeting.getRoom().getRoomId())) {
+                if (newRoom != null && (meeting.getRoom() == null || !newRoom.getRoomId().equals(meeting.getRoom().getRoomId()))) {
                     meeting.setRoom(newRoom);
                 }
             }
@@ -835,7 +1067,7 @@ public class GoogleCalendarService {
             // Cập nhật sync status
             meeting.setSyncStatus(SyncStatus.SYNCED);
         } catch (Exception e) {
-            logger.error("Error updating meeting {} from Google Calendar event {}: {}", 
+            logger.error("Error updating meeting {} from Google Calendar event {}: {}",
                 meeting.getMeetingId(), event.getId(), e.getMessage(), e);
         }
     }
@@ -846,12 +1078,19 @@ public class GoogleCalendarService {
      */
     public void subscribeWatch(User user) throws IOException {
         try {
+            // Skip webhook subscription if URL is not HTTPS (development environment)
+            if (!webhookUrl.startsWith("https://")) {
+                logger.warn("Skipping watch subscription for user {} - webhook URL must be HTTPS. Current URL: {}", 
+                    user.getId(), webhookUrl);
+                logger.info("For local development, calendar sync will use polling instead of webhooks");
+                return;
+            }
+
             logger.info("Subscribing watch for user {}", user.getId());
-            Calendar calendarService = getCalendarService(user);
 
             // Tạo channel ID unique
             String channelId = "imeet-" + user.getId() + "-" + UUID.randomUUID().toString();
-            
+
             // Tạo channel request
             Channel channel = new Channel();
             channel.setId(channelId);
@@ -860,8 +1099,10 @@ public class GoogleCalendarService {
             // Watch trong 7 ngày (Google Calendar watch tối đa 7 ngày, cần renew)
             channel.setExpiration(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000));
 
-            // Subscribe watch
-            Channel response = calendarService.events().watch("primary", channel).execute();
+            // Subscribe watch với retry logic
+            Channel response = executeWithRetry(user, calendarService ->
+                calendarService.events().watch("primary", channel).execute()
+            );
 
             // Lưu channel info vào user
             user.setGoogleChannelId(response.getId());
@@ -869,8 +1110,11 @@ public class GoogleCalendarService {
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
 
-            logger.info("Successfully subscribed watch for user {}. Channel ID: {}, Resource ID: {}", 
+            logger.info("Successfully subscribed watch for user {}. Channel ID: {}, Resource ID: {}",
                 user.getId(), response.getId(), response.getResourceId());
+        } catch (IOException e) {
+            logger.error("Error subscribing watch for user {}: {}", user.getId(), e.getMessage(), e);
+            throw e;
         } catch (Exception e) {
             logger.error("Error subscribing watch for user {}: {}", user.getId(), e.getMessage(), e);
             throw new IOException("Failed to subscribe watch: " + e.getMessage(), e);
@@ -888,19 +1132,30 @@ public class GoogleCalendarService {
 
         try {
             logger.info("Stopping watch for user {}", user.getId());
-            Calendar calendarService = getCalendarService(user);
 
-            // Stop channel
+            // Stop channel với retry logic
             Channel channel = new Channel();
             channel.setId(user.getGoogleChannelId());
             channel.setResourceId(user.getGoogleChannelResourceId());
 
-            calendarService.channels().stop(channel).execute();
+            executeWithRetry(user, calendarService -> {
+                calendarService.channels().stop(channel).execute();
+                return null;
+            });
+
+            // clear channel info from DB
+            user.setGoogleChannelId(null);
+            user.setGoogleChannelResourceId(null);
+            user.setUpdatedAt(LocalDateTime.now());
+            userRepository.save(user);
 
             logger.info("Successfully stopped watch for user {}", user.getId());
+        } catch (IOException e) {
+            logger.error("Error stopping watch for user {}: {}", user.getId(), e.getMessage(), e);
+            throw e;
         } catch (Exception e) {
             logger.error("Error stopping watch for user {}: {}", user.getId(), e.getMessage(), e);
-            // Không throw để không block disconnect
+            // don't block disconnect flow — just log
         }
     }
 
@@ -910,7 +1165,7 @@ public class GoogleCalendarService {
      */
     public void handleWebhook(String channelId, String resourceId, String resourceState, String resourceUri) {
         try {
-            logger.info("Received webhook: channelId={}, resourceId={}, resourceState={}, resourceUri={}", 
+            logger.info("Received webhook: channelId={}, resourceId={}, resourceState={}, resourceUri={}",
                 channelId, resourceId, resourceState, resourceUri);
 
             // Tìm user theo channel ID
@@ -922,10 +1177,6 @@ public class GoogleCalendarService {
 
             User user = userOpt.get();
 
-            // Kiểm tra resource state
-            // "sync" = có thay đổi, cần sync lại
-            // "exists" = channel mới được tạo, không cần sync
-            // "not_exists" = channel không tồn tại, cần renew
             if (resourceState == null || resourceState.isEmpty()) {
                 logger.warn("Webhook with empty resource state, ignoring");
                 return;
@@ -938,23 +1189,26 @@ public class GoogleCalendarService {
 
             if ("not_exists".equals(resourceState)) {
                 logger.warn("Webhook state is 'not_exists', channel may have expired. User: {}", user.getId());
-                // Có thể renew watch ở đây nếu cần
+                // Optionally renew watch here
                 return;
             }
 
-            // Chỉ sync khi state = "sync"
             if (!"sync".equals(resourceState)) {
                 logger.info("Webhook state is not 'sync', ignoring. State: {}", resourceState);
                 return;
             }
 
-            // Sync lại từ Google Calendar
+            // Sync lại từ Google Calendar (1 ngày trước -> 7 ngày sau)
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime startTime = now.minusDays(1);
             LocalDateTime endTime = now.plusDays(7);
 
             logger.info("Triggering sync from Google Calendar for user {} due to webhook", user.getId());
-            syncFromGoogleCalendar(user.getId(), startTime, endTime);
+            try {
+                syncFromGoogleCalendar(user.getId(), startTime, endTime);
+            } catch (Exception e) {
+                logger.error("Error while syncing from Google Calendar after webhook for user {}: {}", user.getId(), e.getMessage(), e);
+            }
 
         } catch (Exception e) {
             logger.error("Error handling webhook: {}", e.getMessage(), e);

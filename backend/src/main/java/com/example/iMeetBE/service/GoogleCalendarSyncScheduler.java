@@ -37,7 +37,7 @@ public class GoogleCalendarSyncScheduler {
      * Lưu ý: Nếu webhook hoạt động, sync sẽ real-time (vài giây)
      * Scheduled job này là fallback nếu webhook không hoạt động
      */
-    @Scheduled(fixedRate = 60000) // 1 phút = 60000ms (để đồng bộ nhanh nhất có thể)
+    @Scheduled(fixedRate = 60000) // 1 phút = 60000ms
     @Transactional
     public void syncFromGoogleCalendar() {
         try {
@@ -69,8 +69,22 @@ public class GoogleCalendarSyncScheduler {
                     logger.info("Synced {} events from Google Calendar for user {}", synced, user.getId());
                 } catch (IOException e) {
                     totalErrors++;
-                    logger.error("Error syncing from Google Calendar for user {}: {}", 
-                        user.getId(), e.getMessage(), e);
+                    // Check if it's authentication error (401)
+                    if (e.getMessage() != null && e.getMessage().contains("401")) {
+                        logger.error("Authentication failed for user {} - disabling Google Calendar sync. User needs to reconnect.", 
+                            user.getId());
+                        // Automatically disable sync to prevent spam logs
+                        try {
+                            user.setGoogleCalendarSyncEnabled(false);
+                            userRepository.save(user);
+                            logger.info("Disabled Google Calendar sync for user {} due to invalid credentials", user.getId());
+                        } catch (Exception disableEx) {
+                            logger.error("Failed to disable sync for user {}: {}", user.getId(), disableEx.getMessage());
+                        }
+                    } else {
+                        logger.error("Error syncing from Google Calendar for user {}: {}", 
+                            user.getId(), e.getMessage());
+                    }
                 } catch (Exception e) {
                     totalErrors++;
                     logger.error("Unexpected error syncing from Google Calendar for user {}: {}", 
