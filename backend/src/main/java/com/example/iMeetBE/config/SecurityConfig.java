@@ -63,6 +63,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/upload-avatar", "/api/auth/remove-avatar").authenticated()
                 .requestMatchers("/api/users/profile").authenticated()
                 .requestMatchers("/api/invitations/**").permitAll() // Cho phép public endpoint để accept/decline invitation
+                .requestMatchers("/api/group-invites/validate/**").permitAll() // Public endpoint để validate invite token
+                .requestMatchers("/api/group-invites/decline/**").permitAll() // Public endpoint để decline invite
+                .requestMatchers("/api/group-invites/**").authenticated() // Các endpoints khác cần auth
+                .requestMatchers("/api/groups/**").authenticated() // Group management cần auth
                 .requestMatchers("/api/rooms/**").permitAll() // Cho phép test API rooms mà không cần authentication
                 .requestMatchers("/api//**").permitAll() 
                 .requestMatchers("/api/devices/**").permitAll() 

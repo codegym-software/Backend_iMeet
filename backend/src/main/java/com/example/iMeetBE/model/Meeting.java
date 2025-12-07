@@ -48,6 +48,10 @@ public class Meeting {
     @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false)
     private User user;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id", nullable = true)
+    private Group group;
+    
     @Enumerated(EnumType.STRING)
     @Column(name = "booking_status", nullable = false)
     private BookingStatus bookingStatus = BookingStatus.BOOKED;
@@ -204,6 +208,14 @@ public class Meeting {
     
     public void setSyncStatus(SyncStatus syncStatus) {
         this.syncStatus = syncStatus;
+    }
+    
+    public Group getGroup() {
+        return group;
+    }
+    
+    public void setGroup(Group group) {
+        this.group = group;
     }
 }
 

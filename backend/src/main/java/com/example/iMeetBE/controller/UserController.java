@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,6 +27,60 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private com.example.iMeetBE.repository.UserRepository userRepository;
+
+    /**
+     * Lấy thông tin profile của user hiện tại
+     * 
+     * @param authentication Thông tin xác thực JWT
+     * @return Thông tin user
+     */
+    @GetMapping("/profile")
+    public ResponseEntity<?> getUserProfile(Authentication authentication) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new UpdateProfileResponse(false, "Unauthorized: JWT token required"));
+            }
+
+            String userId = authentication.getName();
+            
+            // Debug log để kiểm tra userId từ token
+            System.out.println("🔍 Getting profile for userId from JWT: " + userId);
+            
+            com.example.iMeetBE.model.User user = userRepository.findById(userId)
+                .orElse(null);
+            
+            if (user == null) {
+                System.err.println("❌ User not found with ID: " + userId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new UpdateProfileResponse(false, "User not found"));
+            }
+
+            // Tạo response với thông tin user
+            java.util.Map<String, Object> profileData = new java.util.HashMap<>();
+            profileData.put("id", user.getId());
+            profileData.put("username", user.getUsername());
+            profileData.put("email", user.getEmail());
+            profileData.put("fullName", user.getFullName());
+            profileData.put("role", user.getRole().name());
+            profileData.put("avatarUrl", user.getAvatarUrl());
+            profileData.put("googleId", user.getGoogleId());
+            profileData.put("googleCalendarSyncEnabled", user.getGoogleCalendarSyncEnabled());
+            
+            System.out.println("✅ Profile found - Email: " + user.getEmail());
+            
+            return ResponseEntity.ok(profileData);
+
+        } catch (Exception e) {
+            System.err.println("❌ Error getting user profile: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new UpdateProfileResponse(false, "Error: " + e.getMessage()));
+        }
+    }
 
     /**
      * Cập nhật thông tin profile của user

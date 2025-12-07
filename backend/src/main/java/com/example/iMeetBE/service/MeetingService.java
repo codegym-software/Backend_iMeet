@@ -19,12 +19,16 @@ import com.example.iMeetBE.dto.InviteResponse;
 import com.example.iMeetBE.dto.MeetingRequest;
 import com.example.iMeetBE.dto.MeetingResponse;
 import com.example.iMeetBE.model.BookingStatus;
+import com.example.iMeetBE.model.Group;
+import com.example.iMeetBE.model.GroupMember;
 import com.example.iMeetBE.model.InviteRole;
 import com.example.iMeetBE.model.InviteStatus;
 import com.example.iMeetBE.model.Meeting;
 import com.example.iMeetBE.model.MeetingInvitee;
 import com.example.iMeetBE.model.Room;
 import com.example.iMeetBE.model.User;
+import com.example.iMeetBE.repository.GroupMemberRepository;
+import com.example.iMeetBE.repository.GroupRepository;
 import com.example.iMeetBE.repository.MeetingInviteeRepository;
 import com.example.iMeetBE.repository.MeetingRepository;
 import com.example.iMeetBE.repository.RoomRepository;
@@ -58,6 +62,12 @@ public class MeetingService {
 
     @Autowired(required = false)
     private GoogleCalendarService googleCalendarService;
+    
+    @Autowired
+    private GroupRepository groupRepository;
+    
+    @Autowired
+    private GroupMemberRepository groupMemberRepository;
     
     @Transactional(readOnly = true)
     public ApiResponse<List<MeetingResponse>> getMeetingsForInviteeToken(String token) {
@@ -167,6 +177,7 @@ public class MeetingService {
     }
     
     // Tạo cuộc họp mới
+    @Transactional
     public ApiResponse<MeetingResponse> createMeeting(MeetingRequest request, User user) {
         try {
             // Validate thời gian
@@ -224,7 +235,60 @@ public class MeetingService {
                                      request.getBookingStatus() : BookingStatus.BOOKED);
             meeting.setParticipants(0L); // Khởi tạo số participants = 0
             
+            // Xử lý group meeting nếu có
+            if (request.getGroupId() != null) {
+                Group group = groupRepository.findById(request.getGroupId())
+                    .orElseThrow(() -> new RuntimeException("Group không tồn tại"));
+                
+                // Kiểm tra user có phải thành viên của group không
+                boolean isMember = groupMemberRepository.existsByGroupAndUser(group, user);
+                if (!isMember) {
+                    return ApiResponse.error("Bạn không phải thành viên của group này");
+                }
+                
+                meeting.setGroup(group);
+            }
+            
             Meeting savedMeeting = meetingRepository.save(meeting);
+            
+            // Nếu là group meeting, tự động thêm tất cả thành viên vào meeting_invitees
+            if (request.getGroupId() != null) {
+                try {
+                    System.out.println("🔄 Auto-inviting group members for meeting: " + savedMeeting.getMeetingId());
+                    List<GroupMember> groupMembers = groupMemberRepository.findByGroup(meeting.getGroup());
+                    System.out.println("📋 Found " + groupMembers.size() + " group members");
+                    long participantCount = 0;
+                    
+                    for (GroupMember member : groupMembers) {
+                        try {
+                            // Tạo invitation cho từng thành viên
+                            MeetingInvitee invitee = new MeetingInvitee();
+                            invitee.setMeeting(savedMeeting);
+                            invitee.setEmail(member.getUser().getEmail());
+                            invitee.setInvitedBy(user); // Người tạo meeting là người mời
+                            invitee.setStatus(member.getUser().getId().equals(user.getId()) ? 
+                                             InviteStatus.ACCEPTED : InviteStatus.PENDING);
+                            invitee.setRoleInMeeting(InviteRole.PARTICIPANT);
+                            meetingInviteeRepository.save(invitee);
+                            participantCount++;
+                            System.out.println("✅ Added invitee: " + member.getUser().getEmail());
+                        } catch (Exception e) {
+                            System.err.println("❌ Failed to add invitee " + member.getUser().getEmail() + ": " + e.getMessage());
+                            e.printStackTrace();
+                            throw new RuntimeException("Lỗi khi thêm thành viên " + member.getUser().getEmail() + ": " + e.getMessage());
+                        }
+                    }
+                    
+                    // Cập nhật số participants
+                    savedMeeting.setParticipants(participantCount);
+                    savedMeeting = meetingRepository.save(savedMeeting);
+                    System.out.println("✅ Updated participant count: " + participantCount);
+                } catch (Exception e) {
+                    System.err.println("❌ Error in group meeting auto-invite: " + e.getMessage());
+                    e.printStackTrace();
+                    throw e; // Re-throw để rollback transaction
+                }
+            }
             
             // Đồng bộ với Google Calendar nếu user đã kết nối
             if (googleCalendarService != null && user.getGoogleCalendarSyncEnabled() != null && user.getGoogleCalendarSyncEnabled()) {

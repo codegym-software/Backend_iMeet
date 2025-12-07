@@ -912,4 +912,106 @@ public class EmailService {
             "</td></tr></table>" +
             "</body></html>";
     }
+
+    /**
+     * Gửi email mời vào group
+     */
+    public void sendGroupInvitationEmail(String toEmail, String inviterName, String groupName, 
+                                        String inviteLink, String customMessage) {
+        try {
+            String subject = inviterName + " đã mời bạn tham gia group \"" + groupName + "\"";
+            String htmlContent = buildGroupInviteEmailHtml(inviterName, groupName, inviteLink, customMessage);
+            
+            jakarta.mail.internet.MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, "UTF-8");
+            helper.setFrom(displayName + " <" + fromEmail + ">");
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+            mailSender.send(mimeMessage);
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể gửi email mời group: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Build HTML content cho email mời group
+     */
+    private String buildGroupInviteEmailHtml(String inviterName, String groupName, 
+                                            String inviteLink, String customMessage) {
+        String safeInviterName = escapeHtml(inviterName);
+        String safeGroupName = escapeHtml(groupName);
+        String safeCustomMessage = customMessage != null && !customMessage.isBlank() ? 
+            escapeHtml(customMessage) : "";
+        
+        String logoImg = (logoUrl != null && !logoUrl.isBlank()) ?
+            ("<img src=\"" + logoUrl + "\" alt=\"Logo\" style=\"height:48px; display:block; margin:0 auto 16px;\" />") : "";
+
+        return "<!DOCTYPE html>" +
+            "<html><head><meta charset=\"UTF-8\"/>" +
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>" +
+            "<title>Group Invitation</title>" +
+            "</head><body style=\"margin:0; padding:0; background:#f5f5f5; font-family:Arial,Helvetica,sans-serif; color:#333333;\">" +
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background:#f5f5f5; padding:24px 0;\">" +
+            "<tr><td align=\"center\">" +
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"600\" style=\"background:#ffffff; border:1px solid #e0e0e0; border-radius:4px;\">" +
+            
+            // Header
+            "<tr><td style=\"padding:24px; text-align:center; background:#ffffff; border-bottom:2px solid #4a4a4a;\">" +
+            logoImg +
+            "<h1 style=\"margin:0; color:#333333; font-size:22px; font-weight:normal;\">Lời mời tham gia Group</h1>" +
+            "</td></tr>" +
+            
+            // Body
+            "<tr><td style=\"padding:32px 24px;\">" +
+            "<div style=\"margin-bottom:24px;\">" +
+            "<p style=\"margin:0 0 16px; font-size:15px; line-height:1.6; color:#333333;\">" +
+            "Xin chào," +
+            "</p>" +
+            "<p style=\"margin:0 0 16px; font-size:15px; line-height:1.6; color:#333333;\">" +
+            "<strong>" + safeInviterName + "</strong> đã mời bạn tham gia group " +
+            "<strong>" + safeGroupName + "</strong>" +
+            "</p>" +
+            
+            (safeCustomMessage.isEmpty() ? "" : 
+                "<div style=\"margin:20px 0; padding:12px 16px; background:#f9f9f9; border-left:3px solid #666666;\">" +
+                "<p style=\"margin:0; font-size:14px; line-height:1.6; color:#555555; font-style:italic;\">" +
+                "\"" + safeCustomMessage + "\"" +
+                "</p>" +
+                "</div>"
+            ) +
+            
+            "<div style=\"margin:32px 0; text-align:center;\">" +
+            "<a href=\"" + inviteLink + "\" style=\"display:inline-block; padding:12px 32px; background:#4a4a4a; color:#ffffff; text-decoration:none; border-radius:3px; font-size:15px; font-weight:normal;\">" +
+            "Chấp nhận lời mời" +
+            "</a>" +
+            "</div>" +
+            
+            "<div style=\"margin:24px 0; padding:12px 16px; background:#fff9e6; border-left:3px solid #ffa500;\">" +
+            "<p style=\"margin:0; font-size:13px; line-height:1.6; color:#666666;\">" +
+            "<strong>⚠️ Lưu ý:</strong> Lời mời này sẽ hết hạn sau <strong>7 ngày</strong>." +
+            "</p>" +
+            "</div>" +
+            
+            "<p style=\"margin:24px 0 0; font-size:13px; line-height:1.6; color:#666666;\">" +
+            "Nếu nút bên trên không hoạt động, bạn có thể sao chép và dán link sau vào trình duyệt:" +
+            "</p>" +
+            "<p style=\"margin:8px 0 0; padding:10px; background:#f5f5f5; border:1px solid #e0e0e0; font-size:12px; color:#555555; word-break:break-all;\">" +
+            inviteLink +
+            "</p>" +
+            
+            "<p style=\"margin:24px 0 0; font-size:13px; line-height:1.6; color:#666666;\">" +
+            "Nếu bạn không mong đợi email này, bạn có thể bỏ qua nó." +
+            "</p>" +
+            "</div>" +
+            "</td></tr>" +
+            
+            // Footer
+            "<tr><td style=\"padding:16px 24px; background:#f9f9f9; border-top:1px solid #e0e0e0; color:#888888; font-size:12px; text-align:center; line-height:1.5;\">" +
+            "Email được gửi từ hệ thống " + escapeHtml(displayName != null ? displayName : "iMeet") + "." +
+            "</td></tr>" +
+            "</table>" +
+            "</td></tr></table>" +
+            "</body></html>";
+    }
 }

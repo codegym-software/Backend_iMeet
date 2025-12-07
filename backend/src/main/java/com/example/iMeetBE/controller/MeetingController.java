@@ -59,12 +59,12 @@ public class MeetingController {
                     .body(ApiResponse.error("Vui lòng đăng nhập để tạo cuộc họp"));
             }
             
-            // Lấy email từ authentication
-            String email = authentication.getName();
+            // Lấy userId từ authentication (JWT token trả về userId)
+            String userId = authentication.getName();
             
-            // Tìm user theo email
-            User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
+            // Tìm user theo userId
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + userId));
             // Gọi service với userId - sử dụng user object thay vì chỉ ID
             ApiResponse<MeetingResponse> response = meetingService.createMeeting(request, user);
             HttpStatus status = response.isSuccess() ? HttpStatus.CREATED : HttpStatus.BAD_REQUEST;
@@ -94,8 +94,8 @@ public class MeetingController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("Vui lòng đăng nhập để mời người tham gia"));
             }
-            String email = authentication.getName();
-            User inviter = userRepository.findByEmail(email)
+            String userId = authentication.getName();
+            User inviter = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
             ApiResponse<java.util.List<InviteResponse>> response = meetingService.inviteByEmails(meetingId, request, inviter);
@@ -128,11 +128,11 @@ public class MeetingController {
                     .body(ApiResponse.error("Vui lòng đăng nhập để cập nhật cuộc họp"));
             }
             
-            // Lấy email từ authentication
-            String email = authentication.getName();
+            // Lấy userId từ authentication (JWT token trả về userId)
+            String userId = authentication.getName();
             
-            // Tìm user theo email
-            User user = userRepository.findByEmail(email)
+            // Tìm user theo userId
+            User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
             
             // Gọi service với userId để kiểm tra quyền
@@ -157,11 +157,11 @@ public class MeetingController {
                     .body(ApiResponse.error("Vui lòng đăng nhập để hủy cuộc họp"));
             }
             
-            // Lấy email từ authentication
-            String email = authentication.getName();
+            // Lấy userId từ authentication (JWT token trả về userId)
+            String userId = authentication.getName();
             
-            // Tìm user theo email
-            User user = userRepository.findByEmail(email)
+            // Tìm user theo userId
+            User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
             
             // Gọi service với userId để kiểm tra quyền
@@ -187,11 +187,11 @@ public class MeetingController {
                     .body(ApiResponse.error("Vui lòng đăng nhập để cập nhật trạng thái cuộc họp"));
             }
             
-            // Lấy email từ authentication
-            String email = authentication.getName();
+            // Lấy userId từ authentication (JWT token trả về userId)
+            String userId = authentication.getName();
             
-            // Tìm user theo email
-            User user = userRepository.findByEmail(email)
+            // Tìm user theo userId
+            User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
             
             // Gọi service với userId để kiểm tra quyền
@@ -222,12 +222,12 @@ public class MeetingController {
                     .body(ApiResponse.error("Vui lòng đăng nhập để xem cuộc họp của bạn"));
             }
             
-            // Lấy email từ authentication
-            String email = authentication.getName();
+            // Lấy userId từ authentication (JWT token trả về userId)
+            String userId = authentication.getName();
             
-            // Tìm user theo email
-            User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
+            // Tìm user theo userId
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + userId));
             
             // Lấy tất cả cuộc họp của user (owned + invited)
             ApiResponse<List<MeetingResponse>> response = meetingService.getMyMeetings(user);

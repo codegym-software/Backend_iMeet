@@ -27,6 +27,8 @@ public class MeetingRequest {
     @NotNull(message = "ID phòng không được để trống")
     private Integer roomId;
     
+    private Long groupId; // Optional: nếu tạo meeting cho group
+    
     private BookingStatus bookingStatus = BookingStatus.BOOKED;
     
     @Valid
@@ -95,6 +97,14 @@ public class MeetingRequest {
     
     public void setRoomId(Integer roomId) {
         this.roomId = roomId;
+    }
+    
+    public Long getGroupId() {
+        return groupId;
+    }
+    
+    public void setGroupId(Long groupId) {
+        this.groupId = groupId;
     }
     
     public BookingStatus getBookingStatus() {
