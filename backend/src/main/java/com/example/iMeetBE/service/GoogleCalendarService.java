@@ -1,7 +1,6 @@
 package com.example.iMeetBE.service;
 
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -14,42 +13,39 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeRequestUrl;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
-import com.google.api.client.googleapis.auth.oauth2.GoogleRefreshTokenRequest;
-import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
-import com.google.api.client.http.GenericUrl;
-import com.google.api.client.http.HttpResponseException;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.client.util.DateTime;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.services.calendar.Calendar;
-import com.google.api.services.calendar.CalendarScopes;
-import com.google.api.services.calendar.model.Channel;
-import com.google.api.services.calendar.model.Event;
-import com.google.api.services.calendar.model.EventDateTime;
-import com.google.api.services.calendar.model.Events;
 
 import com.example.iMeetBE.model.BookingStatus;
 import com.example.iMeetBE.model.Meeting;
 import com.example.iMeetBE.model.Room;
 import com.example.iMeetBE.model.SyncStatus;
 import com.example.iMeetBE.model.User;
-
 import com.example.iMeetBE.repository.MeetingRepository;
 import com.example.iMeetBE.repository.RoomRepository;
 import com.example.iMeetBE.repository.UserRepository;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeRequestUrl;
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
+import com.google.api.client.googleapis.auth.oauth2.GoogleRefreshTokenRequest;
+import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpResponseException;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.util.DateTime;
+import com.google.api.services.calendar.Calendar;
+import com.google.api.services.calendar.CalendarScopes;
+import com.google.api.services.calendar.model.Channel;
+import com.google.api.services.calendar.model.Event;
+import com.google.api.services.calendar.model.EventDateTime;
+import com.google.api.services.calendar.model.Events;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -520,15 +516,17 @@ public class GoogleCalendarService {
         event.setDescription(meeting.getDescription() != null ? meeting.getDescription() : "");
 
         // Chuyển đổi LocalDateTime sang DateTime (Google Calendar format)
-        ZonedDateTime startZoned = meeting.getStartTime().atZone(ZoneId.systemDefault());
-        ZonedDateTime endZoned = meeting.getEndTime().atZone(ZoneId.systemDefault());
+        // Sử dụng Asia/Ho_Chi_Minh timezone
+        ZoneId vietnamZone = ZoneId.of("Asia/Ho_Chi_Minh");
+        ZonedDateTime startZoned = meeting.getStartTime().atZone(vietnamZone);
+        ZonedDateTime endZoned = meeting.getEndTime().atZone(vietnamZone);
 
         EventDateTime start = new EventDateTime()
                 .setDateTime(new DateTime(startZoned.toInstant().toEpochMilli()))
-                .setTimeZone(ZoneId.systemDefault().getId());
+                .setTimeZone("Asia/Ho_Chi_Minh");
         EventDateTime end = new EventDateTime()
                 .setDateTime(new DateTime(endZoned.toInstant().toEpochMilli()))
-                .setTimeZone(ZoneId.systemDefault().getId());
+                .setTimeZone("Asia/Ho_Chi_Minh");
 
         event.setStart(start);
         event.setEnd(end);

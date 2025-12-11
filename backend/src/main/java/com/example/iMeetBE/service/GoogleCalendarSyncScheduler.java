@@ -69,17 +69,23 @@ public class GoogleCalendarSyncScheduler {
                     logger.info("Synced {} events from Google Calendar for user {}", synced, user.getId());
                 } catch (IOException e) {
                     totalErrors++;
-                    // Check if it's authentication error (401)
-                    if (e.getMessage() != null && e.getMessage().contains("401")) {
-                        logger.error("Authentication failed for user {} - disabling Google Calendar sync. User needs to reconnect.", 
+                    // Check if it's authentication error (401) or invalid_grant
+                    if (e.getMessage() != null && (e.getMessage().contains("401") || e.getMessage().contains("invalid_grant"))) {
+                        logger.error("Authentication failed for user {} - Google Calendar token may be invalid or revoked. User needs to reconnect.", 
                             user.getId());
-                        // Automatically disable sync to prevent spam logs
-                        try {
-                            user.setGoogleCalendarSyncEnabled(false);
-                            userRepository.save(user);
-                            logger.info("Disabled Google Calendar sync for user {} due to invalid credentials", user.getId());
-                        } catch (Exception disableEx) {
-                            logger.error("Failed to disable sync for user {}: {}", user.getId(), disableEx.getMessage());
+                        // Only disable if explicitly invalid_grant (token revoked by user)
+                        if (e.getMessage().contains("invalid_grant")) {
+                            try {
+                                user.setGoogleCalendarSyncEnabled(false);
+                                user.setGoogleRefreshToken(null);
+                                userRepository.save(user);
+                                logger.warn("Disabled Google Calendar sync for user {} - refresh token was revoked", user.getId());
+                            } catch (Exception disableEx) {
+                                logger.error("Failed to disable sync for user {}: {}", user.getId(), disableEx.getMessage());
+                            }
+                        } else {
+                            // For 401 without invalid_grant, just log and retry next time
+                            logger.info("Skipping sync for user {} - will retry on next schedule", user.getId());
                         }
                     } else {
                         logger.error("Error syncing from Google Calendar for user {}: {}", 
