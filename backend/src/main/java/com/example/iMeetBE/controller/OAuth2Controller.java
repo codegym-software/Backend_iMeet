@@ -34,7 +34,7 @@ import jakarta.servlet.http.HttpSession;
 
 @RestController
 @RequestMapping("/api/oauth2")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "https://imeeet.netlify.app"})
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
 public class OAuth2Controller {
 
     @GetMapping("/hosted-ui/login-url-force")

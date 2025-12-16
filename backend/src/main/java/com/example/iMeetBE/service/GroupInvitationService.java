@@ -41,7 +41,7 @@ public class GroupInvitationService {
     @Autowired
     private GroupService groupService;
 
-    @Value("${app.frontend.base-url:https://imeeet.netlify.app}")
+    @Value("${app.frontend.base-url:http://localhost:3000}")
     private String frontendBaseUrl;
 
     @Value("${jwt.secret:your-secret-key-change-this-in-production}")

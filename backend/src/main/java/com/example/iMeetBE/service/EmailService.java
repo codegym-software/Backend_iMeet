@@ -27,10 +27,10 @@ public class EmailService {
     @Value("${app.email.logo-url:}")
     private String logoUrl; // URL logo nếu có
 
-    @Value("${app.api.base-url:https://imeett.site}")
+    @Value("${app.api.base-url:http://localhost:8081}")
     private String apiBaseUrl; // Base URL của backend API
     
-    @Value("${app.frontend.base-url:https://imeeet.site}")
+    @Value("${app.frontend.base-url:http://localhost:3000}")
     private String frontendBaseUrl; // Base URL của frontend
     
     public void sendVerificationCode(String toEmail, String code) {

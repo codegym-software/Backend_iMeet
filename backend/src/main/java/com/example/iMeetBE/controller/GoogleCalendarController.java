@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/auth/google/calendar")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "https://imeeet.netlify.app"}, allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
 public class GoogleCalendarController {
 
     private static final Logger logger = LoggerFactory.getLogger(GoogleCalendarController.class);
@@ -155,7 +155,7 @@ public class GoogleCalendarController {
               "setTimeout(() => { " +
               "  const currentPath = window.location.pathname; " +
               "  if (currentPath.includes('callback')) { " +
-              "    window.location.replace('http://localhost:3001/profile'); " +
+              "    window.location.replace('http://localhost:3000/profile'); " +
               "  } " +
               "}, 1500); " +
               "} catch(e) { console.error('Redirect error:', e); }"
@@ -163,7 +163,7 @@ public class GoogleCalendarController {
               "localStorage.setItem('calendar_connection_error', '" + error + "'); " +
               "localStorage.removeItem('calendar_connecting'); " +
               "console.log('Calendar connection failed, redirecting to home...'); " +
-              "setTimeout(() => { window.location.replace('http://localhost:3001/trang-chu'); }, 2000); " +
+              "setTimeout(() => { window.location.replace('http://localhost:3000/trang-chu'); }, 2000); " +
               "} catch(e) { console.error('Redirect error:', e); }";
         
         return "<!DOCTYPE html>" +

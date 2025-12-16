@@ -16,7 +16,7 @@ import com.example.iMeetBE.service.ForgotPasswordService;
 
 @RestController
 @RequestMapping("/api/forgot-password")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "https://imeeet.netlify.app"})
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
 public class ForgotPasswordController {
     
     @Autowired
