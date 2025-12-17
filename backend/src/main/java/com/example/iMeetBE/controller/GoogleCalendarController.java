@@ -1,10 +1,11 @@
 package com.example.iMeetBE.controller;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,21 +19,15 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.view.RedirectView;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 import com.example.iMeetBE.model.User;
 import com.example.iMeetBE.repository.UserRepository;
 import com.example.iMeetBE.service.GoogleCalendarService;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import com.example.iMeetBE.service.JwtService;
 
 @RestController
 @RequestMapping("/api/auth/google/calendar")
+@CrossOrigin(origins = {"https://imeett.site", "https://www.imeett.site"}, allowCredentials = "true")
 public class GoogleCalendarController {
 
     private static final Logger logger = LoggerFactory.getLogger(GoogleCalendarController.class);
@@ -43,35 +38,46 @@ public class GoogleCalendarController {
     @Autowired
     private UserRepository userRepository;
     
-    @Value("${app.frontend.base-url}")
-    private String frontendBaseUrl;
+    @Autowired
+    private JwtService jwtService;
 
     /**
      * Lấy URL để kết nối Google Calendar
      */
     @GetMapping("/auth-url")
-    public ResponseEntity<Map<String, Object>> getAuthorizationUrl(Authentication authentication) {
+    public ResponseEntity<Map<String, Object>> getAuthorizationUrl(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
-            if (authentication == null) {
+            logger.info("📞 /auth-url called. Auth header present: {}", authHeader != null);
+            
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                logger.warn("❌ No valid authorization header");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("success", false, "error", "Vui lòng đăng nhập"));
             }
 
-            String email = authentication.getName();
+            String token = authHeader.substring(7);
+            String email = jwtService.getEmailFromToken(token);
+            logger.info("🔍 Looking for user with email: {}", email);
+            
             Optional<User> userOpt = userRepository.findByEmail(email);
             if (!userOpt.isPresent()) {
+                logger.warn("❌ User not found with email: {}", email);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("success", false, "error", "Không tìm thấy người dùng"));
             }
 
             User user = userOpt.get();
+            logger.info("✅ User found: {} (ID: {})", user.getEmail(), user.getId());
+            
             String authUrl = googleCalendarService.getAuthorizationUrl(user.getId());
+            logger.info("✅ Auth URL generated: {}", authUrl);
 
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "authUrl", authUrl
             ));
         } catch (Exception e) {
+            logger.error("❌ Error in /auth-url: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("success", false, "error", "Lỗi khi tạo authorization URL: " + e.getMessage()));
         }
@@ -158,7 +164,7 @@ public class GoogleCalendarController {
               "setTimeout(() => { " +
               "  const currentPath = window.location.pathname; " +
               "  if (currentPath.includes('callback')) { " +
-              "    window.location.replace('" + frontendBaseUrl + "/profile'); " +
+              "    window.location.replace('https://imeett.site/profile'); " +
               "  } " +
               "}, 1500); " +
               "} catch(e) { console.error('Redirect error:', e); }"
@@ -166,7 +172,7 @@ public class GoogleCalendarController {
               "localStorage.setItem('calendar_connection_error', '" + error + "'); " +
               "localStorage.removeItem('calendar_connecting'); " +
               "console.log('Calendar connection failed, redirecting to home...'); " +
-              "setTimeout(() => { window.location.replace('" + frontendBaseUrl + "/trang-chu'); }, 2000); " +
+              "setTimeout(() => { window.location.replace('https://imeett.site/trang-chu'); }, 2000); " +
               "} catch(e) { console.error('Redirect error:', e); }";
         
         return "<!DOCTYPE html>" +
@@ -193,14 +199,15 @@ public class GoogleCalendarController {
      * Kiểm tra trạng thái kết nối Google Calendar
      */
     @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> getConnectionStatus(Authentication authentication) {
+    public ResponseEntity<Map<String, Object>> getConnectionStatus(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
-            if (authentication == null) {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("success", false, "error", "Vui lòng đăng nhập"));
             }
 
-            String email = authentication.getName();
+            String token = authHeader.substring(7);
+            String email = jwtService.getEmailFromToken(token);
             Optional<User> userOpt = userRepository.findByEmail(email);
             if (!userOpt.isPresent()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -228,14 +235,15 @@ public class GoogleCalendarController {
      * Ngắt kết nối Google Calendar
      */
     @DeleteMapping("/disconnect")
-    public ResponseEntity<Map<String, Object>> disconnectCalendar(Authentication authentication) {
+    public ResponseEntity<Map<String, Object>> disconnectCalendar(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
-            if (authentication == null) {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("success", false, "error", "Vui lòng đăng nhập"));
             }
 
-            String email = authentication.getName();
+            String token = authHeader.substring(7);
+            String email = jwtService.getEmailFromToken(token);
             Optional<User> userOpt = userRepository.findByEmail(email);
             if (!userOpt.isPresent()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)

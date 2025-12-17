@@ -15,19 +15,19 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.example.iMeetBE.security.JwtAuthenticationFilter;
-import com.example.iMeetBE.security.RestAuthenticationEntryPoint;
 import com.example.iMeetBE.security.RestAccessDeniedHandler;
+import com.example.iMeetBE.security.RestAuthenticationEntryPoint;
 import com.example.iMeetBE.service.CustomOAuth2UserService;
 import com.example.iMeetBE.service.CustomUserDetailsService;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
     @Value("${app.frontend.base-url}")
     private String frontendBaseUrl;
     
     @Value("${app.api.base-url}")
+
     private String apiBaseUrl;
 
     @Autowired
@@ -53,7 +53,7 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(request -> {
                 var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
-                corsConfiguration.setAllowedOriginPatterns(java.util.List.of(frontendBaseUrl, "http://localhost:3000", "http://localhost:3001", apiBaseUrl));
+                corsConfiguration.setAllowedOriginPatterns(java.util.List.of("http://localhost:3000", "http://localhost:3001", "http://localhost:8081", "https://imeett.site/"));
                 corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                 corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
                 corsConfiguration.setAllowCredentials(true); // Cho phép credentials từ frontend
@@ -81,9 +81,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/room-devices/**").permitAll() // Cho phép test API devices mà không cần authentication
                 .requestMatchers("/api/oauth2/**").permitAll()
                 .requestMatchers("/api/auth/google/calendar/callback").permitAll()
-                .requestMatchers("/api/auth/google/calendar/webhook").permitAll() // Webhook từ Google không cần auth
-                .requestMatchers("/api/auth/google/calendar/status").permitAll() // Public endpoint để check connection status
-                .requestMatchers("/api/auth/google/calendar/auth-url").permitAll() // Public endpoint để get authorization URL
+                .requestMatchers("/api/auth/google/calendar/webhook").permitAll()
+                .requestMatchers("/api/auth/google/calendar/status").permitAll()
+                .requestMatchers("/api/auth/google/calendar/auth-url").permitAll()
                 .requestMatchers("/api/auth/google/calendar/**").authenticated()
                 .requestMatchers("/api/cognito/**").hasRole("ADMIN")
                 .requestMatchers("/api/test/**").permitAll()
@@ -93,7 +93,7 @@ public class SecurityConfig {
                 .requestMatchers("/uploads/**").permitAll()
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint(restAuthenticationEntryPoint)
                 .accessDeniedHandler(restAccessDeniedHandler)
