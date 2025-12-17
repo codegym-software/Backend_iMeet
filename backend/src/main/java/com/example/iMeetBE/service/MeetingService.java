@@ -38,6 +38,17 @@ import com.example.iMeetBE.repository.UserRepository;
 @Transactional
 public class MeetingService {
     
+    // Inner class để lưu thông tin email
+    private static class EmailData {
+        final String email;
+        final String token;
+        
+        EmailData(String email, String token) {
+            this.email = email;
+            this.token = token;
+        }
+    }
+    
     @Autowired
     private MeetingRepository meetingRepository;
     
@@ -259,9 +270,16 @@ public class MeetingService {
                     System.out.println("📋 Found " + groupMembers.size() + " group members");
                     long participantCount = 0;
                     
-                    // Queue để lưu các email cần gửi sau khi commit transaction
-                    final java.util.List<java.util.AbstractMap.SimpleEntry<String, MeetingInvitee>> emailQueue = 
-                        new java.util.ArrayList<>();
+                    // Lưu thông tin để gửi email sau khi commit transaction
+                    final java.util.List<EmailData> emailQueue = new java.util.ArrayList<>();
+                    final String meetingTitle = savedMeeting.getTitle();
+                    final String meetingDescription = savedMeeting.getDescription();
+                    final String meetingStartTime = savedMeeting.getStartTime().toString();
+                    final String meetingEndTime = savedMeeting.getEndTime().toString();
+                    final String roomName = savedMeeting.getRoom() != null ? savedMeeting.getRoom().getName() : null;
+                    final String roomLocation = savedMeeting.getRoom() != null ? savedMeeting.getRoom().getLocation() : null;
+                    final String inviterName = user.getFullName() != null ? user.getFullName() : user.getEmail();
+                    final String groupName = meeting.getGroup().getName();
                     
                     for (GroupMember member : groupMembers) {
                         try {
@@ -277,11 +295,11 @@ public class MeetingService {
                             participantCount++;
                             System.out.println("✅ Added invitee: " + member.getUser().getEmail());
                             
-                            // Chỉ gửi email cho các thành viên không phải người tạo meeting
-                            if (!member.getUser().getId().equals(user.getId())) {
-                                emailQueue.add(new java.util.AbstractMap.SimpleEntry<>(
-                                    member.getUser().getEmail(), invitee));
-                            }
+                            // Lưu tất cả thông tin cần thiết vào queue (không lưu object reference)
+                            emailQueue.add(new EmailData(
+                                member.getUser().getEmail(),
+                                invitee.getToken() // Lấy token ngay khi còn trong transaction
+                            ));
                         } catch (Exception e) {
                             System.err.println("❌ Failed to add invitee " + member.getUser().getEmail() + ": " + e.getMessage());
                             e.printStackTrace();
@@ -296,41 +314,32 @@ public class MeetingService {
                     
                     // Gửi email sau khi commit transaction
                     if (!emailQueue.isEmpty()) {
-                        final Meeting finalMeeting = savedMeeting;
-                        final String roomName = finalMeeting.getRoom() != null ? finalMeeting.getRoom().getName() : null;
-                        final String roomLocation = finalMeeting.getRoom() != null ? finalMeeting.getRoom().getLocation() : null;
-                        final String inviterName = user.getFullName() != null ? user.getFullName() : user.getEmail();
-                        final String groupName = meeting.getGroup().getName();
-                        
                         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                             @Override
                             public void afterCommit() {
                                 System.out.println("📧 Sending group meeting invitation emails to " + emailQueue.size() + " members");
-                                for (java.util.AbstractMap.SimpleEntry<String, MeetingInvitee> entry : emailQueue) {
+                                for (EmailData emailData : emailQueue) {
                                     try {
-                                        String recipientEmail = entry.getKey();
-                                        MeetingInvitee invitee = entry.getValue();
-                                        
-                                        String subject = "Lời mời tham gia cuộc họp từ group " + groupName + " - " + finalMeeting.getTitle();
+                                        String subject = "Lời mời tham gia cuộc họp từ group " + groupName + " - " + meetingTitle;
                                         String customMessage = "Bạn được mời tham gia cuộc họp này từ group \"" + groupName + "\".";
                                         
                                         String htmlContent = emailService.buildMeetingInviteHtml(
-                                            finalMeeting.getTitle(),
-                                            finalMeeting.getDescription(),
-                                            finalMeeting.getStartTime().toString(),
-                                            finalMeeting.getEndTime().toString(),
+                                            meetingTitle,
+                                            meetingDescription,
+                                            meetingStartTime,
+                                            meetingEndTime,
                                             inviterName,
                                             customMessage,
                                             roomName,
                                             roomLocation,
-                                            invitee.getToken()
+                                            emailData.token
                                         );
                                         
-                                        emailService.sendMeetingInviteHtml(recipientEmail, subject, htmlContent);
-                                        System.out.println("✅ Sent email to: " + recipientEmail);
+                                        emailService.sendMeetingInviteHtml(emailData.email, subject, htmlContent);
+                                        System.out.println("✅ Sent email to: " + emailData.email);
                                     } catch (Exception e) {
-                                        System.err.println("❌ Failed to send email to " + entry.getKey() + ": " + e.getMessage());
-                                        // Không throw exception để không ảnh hưởng đến việc gửi email cho người khác
+                                        System.err.println("❌ Failed to send email to " + emailData.email + ": " + e.getMessage());
+                                        e.printStackTrace();
                                     }
                                 }
                                 System.out.println("✅ Completed sending group meeting invitation emails");
