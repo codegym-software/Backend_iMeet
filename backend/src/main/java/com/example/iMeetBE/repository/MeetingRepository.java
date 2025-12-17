@@ -98,6 +98,10 @@ public interface MeetingRepository extends JpaRepository<Meeting, Integer> {
     @Query("SELECT m FROM Meeting m WHERE m.endTime < :now AND m.bookingStatus <> 'CANCELLED'")
     List<Meeting> findEndedBefore(@Param("now") LocalDateTime now);
     
+    // Tìm các cuộc họp của một group (chưa hủy và chưa kết thúc)
+    @Query("SELECT m FROM Meeting m WHERE m.group.id = :groupId AND m.bookingStatus <> 'CANCELLED' AND m.endTime >= :now")
+    List<Meeting> findActiveByGroupId(@Param("groupId") Long groupId, @Param("now") LocalDateTime now);
+    
     // Tìm các cuộc họp sắp diễn ra trong khoảng thời gian để gửi reminder
     @Query("""
         SELECT DISTINCT m FROM Meeting m 
