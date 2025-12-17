@@ -34,8 +34,10 @@ import jakarta.servlet.http.HttpSession;
 
 @RestController
 @RequestMapping("/api/oauth2")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
 public class OAuth2Controller {
+
+    @Value("${app.frontend.base-url}")
+    private String frontendBaseUrl;
 
     @GetMapping("/hosted-ui/login-url-force")
     public Map<String, String> getHostedUILoginUrlForcePrompt() {
@@ -178,7 +180,7 @@ public class OAuth2Controller {
             "client_id=%s&" +
             "logout_uri=%s",
             clientId,
-            "https://imeeet.netlify.app/login,http://localhost:3000/login,http://localhost:3001/login"
+            frontendBaseUrl + "/login"
         );
         
         return Map.of(
@@ -196,7 +198,7 @@ public class OAuth2Controller {
             "logout_uri=%s&" +
             "response_mode=query",
             clientId,
-            "https://imeeet.netlify.app/login,http://localhost:3000/login,http://localhost:3001/login"
+            frontendBaseUrl + "/login"
         );
         
         return ResponseEntity.status(HttpStatus.FOUND)
@@ -240,7 +242,7 @@ public class OAuth2Controller {
             body.add("grant_type", "authorization_code");
             body.add("client_id", clientId);
             body.add("code", authorizationCode);
-            body.add("redirect_uri", "https://imeeet.netlify.app/oauth2/callback,http://localhost:3000/oauth2/callback,http://localhost:3001/oauth2/callback");
+            body.add("redirect_uri", frontendBaseUrl + "/oauth2/callback");
 
             // Chuẩn bị headers với Basic Authentication
             HttpHeaders headers = new HttpHeaders();

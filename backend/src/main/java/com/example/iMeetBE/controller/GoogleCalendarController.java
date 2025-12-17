@@ -29,10 +29,10 @@ import com.example.iMeetBE.service.GoogleCalendarService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/api/auth/google/calendar")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
 public class GoogleCalendarController {
 
     private static final Logger logger = LoggerFactory.getLogger(GoogleCalendarController.class);
@@ -42,6 +42,9 @@ public class GoogleCalendarController {
 
     @Autowired
     private UserRepository userRepository;
+    
+    @Value("${app.frontend.base-url}")
+    private String frontendBaseUrl;
 
     /**
      * Lấy URL để kết nối Google Calendar
@@ -155,7 +158,7 @@ public class GoogleCalendarController {
               "setTimeout(() => { " +
               "  const currentPath = window.location.pathname; " +
               "  if (currentPath.includes('callback')) { " +
-              "    window.location.replace('http://localhost:3000/profile'); " +
+              "    window.location.replace('" + frontendBaseUrl + "/profile'); " +
               "  } " +
               "}, 1500); " +
               "} catch(e) { console.error('Redirect error:', e); }"
@@ -163,7 +166,7 @@ public class GoogleCalendarController {
               "localStorage.setItem('calendar_connection_error', '" + error + "'); " +
               "localStorage.removeItem('calendar_connecting'); " +
               "console.log('Calendar connection failed, redirecting to home...'); " +
-              "setTimeout(() => { window.location.replace('http://localhost:3000/trang-chu'); }, 2000); " +
+              "setTimeout(() => { window.location.replace('" + frontendBaseUrl + "/trang-chu'); }, 2000); " +
               "} catch(e) { console.error('Redirect error:', e); }";
         
         return "<!DOCTYPE html>" +

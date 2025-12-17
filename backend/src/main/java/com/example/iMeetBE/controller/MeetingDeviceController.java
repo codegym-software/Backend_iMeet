@@ -24,7 +24,6 @@ import com.example.iMeetBE.service.MeetingDeviceService;
 
 @RestController
 @RequestMapping("/api/meeting-devices")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
 public class MeetingDeviceController {
     
     @Autowired

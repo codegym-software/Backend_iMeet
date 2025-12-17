@@ -1,6 +1,7 @@
 package com.example.iMeetBE.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -22,6 +23,12 @@ import com.example.iMeetBE.service.CustomUserDetailsService;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    @Value("${app.frontend.base-url}")
+    private String frontendBaseUrl;
+    
+    @Value("${app.api.base-url}")
+    private String apiBaseUrl;
 
     @Autowired
     private CustomOAuth2UserService customOAuth2UserService;
@@ -46,7 +53,7 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(request -> {
                 var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
-                corsConfiguration.setAllowedOriginPatterns(java.util.List.of("http://localhost:3000", "http://localhost:3001", "http://localhost:8081", "https://imeeet.netlify.app"));
+                corsConfiguration.setAllowedOriginPatterns(java.util.List.of(frontendBaseUrl, "http://localhost:3000", "http://localhost:3001", apiBaseUrl));
                 corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                 corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
                 corsConfiguration.setAllowCredentials(true); // Cho phép credentials từ frontend
@@ -75,6 +82,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/oauth2/**").permitAll()
                 .requestMatchers("/api/auth/google/calendar/callback").permitAll()
                 .requestMatchers("/api/auth/google/calendar/webhook").permitAll() // Webhook từ Google không cần auth
+                .requestMatchers("/api/auth/google/calendar/status").permitAll() // Public endpoint để check connection status
+                .requestMatchers("/api/auth/google/calendar/auth-url").permitAll() // Public endpoint để get authorization URL
                 .requestMatchers("/api/auth/google/calendar/**").authenticated()
                 .requestMatchers("/api/cognito/**").hasRole("ADMIN")
                 .requestMatchers("/api/test/**").permitAll()
@@ -113,7 +122,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler() {
         SimpleUrlAuthenticationSuccessHandler handler = new SimpleUrlAuthenticationSuccessHandler();
-        handler.setDefaultTargetUrl("https://imeeet.netlify.app/oauth2/callback,http://localhost:3000/oauth2/callback,http://localhost:3001/oauth2/callback"); // Always redirect to callback
+        handler.setDefaultTargetUrl(frontendBaseUrl + "/oauth2/callback");
         handler.setAlwaysUseDefaultTargetUrl(true);
         return handler;
     }

@@ -38,7 +38,6 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/meetings")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
 public class MeetingController {
     
     @Autowired

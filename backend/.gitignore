@@ -8,9 +8,10 @@ fly.toml
 # Log file
 *.log
 
+.env.example
 # BlueJ files
 *.ctxt
-
+pom.xml.tag
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
 

@@ -18,7 +18,6 @@ import com.example.iMeetBE.repository.MeetingRepository;
 
 @RestController
 @RequestMapping("/api/aws")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowCredentials = "true")
 public class AwsTestController {
 
     @Autowired
