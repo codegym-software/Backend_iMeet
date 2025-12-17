@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.iMeetBE.dto.UpdateProfileRequest;
 import com.example.iMeetBE.dto.UpdateProfileResponse;
+import com.example.iMeetBE.dto.UserPreferencesRequest;
+import com.example.iMeetBE.dto.UserPreferencesResponse;
 import com.example.iMeetBE.service.UserService;
 
 import jakarta.validation.Valid;
@@ -157,5 +159,59 @@ public class UserController {
             ));
         }
 
+    }
+
+    /**
+     * Lấy preferences của user hiện tại (group colors, etc.)
+     */
+    @GetMapping("/preferences")
+    public ResponseEntity<?> getUserPreferences(Authentication authentication) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new UserPreferencesResponse(false, "Unauthorized: JWT token required", null));
+            }
+
+            String userId = authentication.getName();
+            System.out.println("🔍 Getting preferences for userId: " + userId);
+            
+            UserPreferencesRequest preferences = userService.getUserPreferences(userId);
+            
+            return ResponseEntity.ok(new UserPreferencesResponse(true, "Preferences retrieved successfully", preferences));
+
+        } catch (Exception e) {
+            System.err.println("❌ Error getting user preferences: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new UserPreferencesResponse(false, "Error: " + e.getMessage(), null));
+        }
+    }
+
+    /**
+     * Cập nhật preferences của user (group colors, etc.)
+     */
+    @PutMapping("/preferences")
+    public ResponseEntity<?> updateUserPreferences(
+            @RequestBody UserPreferencesRequest preferences,
+            Authentication authentication) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new UserPreferencesResponse(false, "Unauthorized: JWT token required", null));
+            }
+
+            String userId = authentication.getName();
+            System.out.println("🔍 Updating preferences for userId: " + userId);
+            
+            userService.updateUserPreferences(userId, preferences);
+            
+            return ResponseEntity.ok(new UserPreferencesResponse(true, "Preferences updated successfully", preferences));
+
+        } catch (Exception e) {
+            System.err.println("❌ Error updating user preferences: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new UserPreferencesResponse(false, "Error: " + e.getMessage(), null));
+        }
     }
 }

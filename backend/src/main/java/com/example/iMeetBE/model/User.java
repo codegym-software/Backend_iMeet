@@ -54,6 +54,9 @@ public class User {
     @Column(name = "google_channel_resource_id", length = 255)
     private String googleChannelResourceId; // Resource ID từ Google Calendar Watch
 
+    @Column(name = "preferences", columnDefinition = "JSON")
+    private String preferences; // JSON string chứa user preferences (group colors, etc.)
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private UserRole role = UserRole.USER;
@@ -197,6 +200,14 @@ public class User {
 
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public String getPreferences() {
+        return preferences;
+    }
+
+    public void setPreferences(String preferences) {
+        this.preferences = preferences;
     }
 
     // Alias method for getUserId (for compatibility)

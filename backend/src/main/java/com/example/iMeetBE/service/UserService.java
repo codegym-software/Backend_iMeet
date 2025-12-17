@@ -7,14 +7,17 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
 import com.amazonaws.services.cognitoidp.model.AWSCognitoIdentityProviderException;
 import com.amazonaws.services.cognitoidp.model.AdminUpdateUserAttributesRequest;
 import com.amazonaws.services.cognitoidp.model.AttributeType;
 import com.example.iMeetBE.dto.UpdateProfileRequest;
+import com.example.iMeetBE.dto.UserPreferencesRequest;
 import com.example.iMeetBE.model.User;
 import com.example.iMeetBE.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class UserService {
@@ -27,6 +30,9 @@ public class UserService {
 
     @Value("${aws.cognito.user-pool-id}")
     private String userPoolId;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     public void updateUserProfile(String username, UpdateProfileRequest request) {
         try {
@@ -180,6 +186,43 @@ public class UserService {
         } catch (AWSCognitoIdentityProviderException e) {
             System.err.println("❌ Error updating user profile in Cognito: " + e.getMessage());
             throw new RuntimeException("Failed to update user profile: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void updateUserPreferences(String userId, UserPreferencesRequest preferences) {
+        try {
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+            
+            // Convert preferences object to JSON string
+            String preferencesJson = objectMapper.writeValueAsString(preferences);
+            user.setPreferences(preferencesJson);
+            userRepository.save(user);
+            
+            System.out.println("✅ Updated preferences for user: " + userId);
+        } catch (Exception e) {
+            System.err.println("❌ Error updating user preferences: " + e.getMessage());
+            throw new RuntimeException("Failed to update user preferences: " + e.getMessage());
+        }
+    }
+
+    public UserPreferencesRequest getUserPreferences(String userId) {
+        try {
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+            
+            String preferencesJson = user.getPreferences();
+            if (preferencesJson == null || preferencesJson.trim().isEmpty()) {
+                // Return default preferences if none exist
+                return new UserPreferencesRequest();
+            }
+            
+            // Parse JSON string to preferences object
+            return objectMapper.readValue(preferencesJson, UserPreferencesRequest.class);
+        } catch (Exception e) {
+            System.err.println("❌ Error getting user preferences: " + e.getMessage());
+            throw new RuntimeException("Failed to get user preferences: " + e.getMessage());
         }
     }
 }
