@@ -18,6 +18,7 @@ import javax.crypto.SecretKey;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -40,6 +41,12 @@ public class GroupInvitationService {
 
     @Autowired
     private GroupService groupService;
+    
+    @Autowired
+    private MeetingRepository meetingRepository;
+    
+    @Autowired
+    private MeetingInviteeRepository meetingInviteeRepository;
 
     @Value("${app.frontend.base-url:http://localhost:3000}")
     private String frontendBaseUrl;
@@ -222,6 +229,66 @@ public class GroupInvitationService {
         // Thêm vào group
         GroupMember member = new GroupMember(group, user, invite.getInvitedRole());
         groupMemberRepository.save(member);
+        
+        // Tự động thêm thành viên mới vào các meeting_invitees của group (các cuộc họp chưa kết thúc)
+        try {
+            List<Meeting> groupMeetings = meetingRepository.findActiveByGroupId(group.getId(), LocalDateTime.now());
+            System.out.println("🔄 Adding new member to " + groupMeetings.size() + " existing group meetings");
+            
+            for (Meeting meeting : groupMeetings) {
+                // Kiểm tra xem user đã được mời chưa
+                Optional<MeetingInvitee> existingInvite = meetingInviteeRepository.findByMeetingAndEmail(meeting, user.getEmail());
+                if (!existingInvite.isPresent()) {
+                    MeetingInvitee invitee = new MeetingInvitee();
+                    invitee.setMeeting(meeting);
+                    invitee.setEmail(user.getEmail());
+                    invitee.setUser(user);
+                    invitee.setInvitedBy(group.getOwner()); // Owner của group là người mời
+                    invitee.setStatus(InviteStatus.PENDING);
+                    invitee.setRoleInMeeting(InviteRole.PARTICIPANT);
+                    meetingInviteeRepository.save(invitee);
+                    
+                    // Cập nhật số participants
+                    meeting.setParticipants(meeting.getParticipants() + 1);
+                    meetingRepository.save(meeting);
+                    
+                    System.out.println("✅ Added to meeting: " + meeting.getTitle());
+                    
+                    // Gửi email thông báo về cuộc họp
+                    try {
+                        String inviterName = group.getOwner().getFullName() != null ? 
+                            group.getOwner().getFullName() : group.getOwner().getEmail();
+                        String roomName = meeting.getRoom() != null ? meeting.getRoom().getName() : null;
+                        String roomLocation = meeting.getRoom() != null ? meeting.getRoom().getLocation() : null;
+                        
+                        String subject = "Lời mời tham gia cuộc họp từ group " + group.getName() + " - " + meeting.getTitle();
+                        String customMessage = "Bạn đã gia nhập group \"" + group.getName() + 
+                            "\" và được tự động mời tham gia cuộc họp này.";
+                        
+                        String htmlContent = emailService.buildMeetingInviteHtml(
+                            meeting.getTitle(),
+                            meeting.getDescription(),
+                            meeting.getStartTime().toString(),
+                            meeting.getEndTime().toString(),
+                            inviterName,
+                            customMessage,
+                            roomName,
+                            roomLocation,
+                            invitee.getToken()
+                        );
+                        
+                        emailService.sendMeetingInviteHtml(user.getEmail(), subject, htmlContent);
+                        System.out.println("✅ Sent meeting invitation email to: " + user.getEmail());
+                    } catch (Exception emailEx) {
+                        System.err.println("❌ Failed to send meeting invitation email: " + emailEx.getMessage());
+                        // Không throw exception để không ảnh hưởng đến việc thêm vào group
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error adding new member to existing meetings: " + e.getMessage());
+            // Không throw exception để không rollback việc thêm vào group
+        }
 
         // Cập nhật invite status
         invite.setStatus(InviteStatusGroup.ACCEPTED);
