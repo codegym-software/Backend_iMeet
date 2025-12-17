@@ -41,11 +41,10 @@ public class MeetingService {
     // Inner class để lưu thông tin email
     private static class EmailData {
         final String email;
-        final String token;
         
         EmailData(String email, String token) {
             this.email = email;
-            this.token = token;
+            // token không cần thiết cho email thông báo group
         }
     }
     
@@ -317,25 +316,22 @@ public class MeetingService {
                         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                             @Override
                             public void afterCommit() {
-                                System.out.println("📧 Sending group meeting invitation emails to " + emailQueue.size() + " members");
+                                System.out.println("📧 Sending group meeting notification emails to " + emailQueue.size() + " members");
                                 for (EmailData emailData : emailQueue) {
                                     try {
-                                        String subject = "Lời mời tham gia cuộc họp từ group " + groupName + " - " + meetingTitle;
-                                        String customMessage = "Bạn được mời tham gia cuộc họp này từ group \"" + groupName + "\".";
-                                        
-                                        String htmlContent = emailService.buildMeetingInviteHtml(
+                                        // Gửi email thông báo (không có nút accept/decline) cho group meetings
+                                        emailService.sendGroupMeetingNotification(
+                                            emailData.email,
+                                            emailData.email, // member name, có thể lấy từ User nếu cần
                                             meetingTitle,
                                             meetingDescription,
                                             meetingStartTime,
                                             meetingEndTime,
-                                            inviterName,
-                                            customMessage,
                                             roomName,
                                             roomLocation,
-                                            emailData.token
+                                            inviterName,
+                                            groupName
                                         );
-                                        
-                                        emailService.sendMeetingInviteHtml(emailData.email, subject, htmlContent);
                                         System.out.println("✅ Sent email to: " + emailData.email);
                                     } catch (Exception e) {
                                         System.err.println("❌ Failed to send email to " + emailData.email + ": " + e.getMessage());
