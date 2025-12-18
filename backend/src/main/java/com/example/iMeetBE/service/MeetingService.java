@@ -712,7 +712,22 @@ public class MeetingService {
                 }
             }
             
-            // Xóa hoàn toàn khỏi database
+            // Xóa các bảng con trước khi xóa meeting (tránh foreign key constraint)
+            // 1. Xóa meeting invitees
+            List<com.example.iMeetBE.model.MeetingInvitee> invitees = meetingInviteeRepository.findByMeeting(meeting);
+            if (!invitees.isEmpty()) {
+                meetingInviteeRepository.deleteAll(invitees);
+                System.out.println("Đã xóa " + invitees.size() + " invitees");
+            }
+            
+            // 2. Xóa meeting devices
+            List<com.example.iMeetBE.model.MeetingDevice> devices = meetingDeviceRepository.findByMeetingMeetingId(meetingId);
+            if (!devices.isEmpty()) {
+                meetingDeviceRepository.deleteAll(devices);
+                System.out.println("Đã xóa " + devices.size() + " devices");
+            }
+            
+            // 3. Xóa meeting chính
             meetingRepository.delete(meeting);
             
             return ApiResponse.success(null, "Xóa cuộc họp thành công");
