@@ -636,8 +636,8 @@ public class MeetingService {
         }
     }
     
-    // Hủy cuộc họp (cập nhật trạng thái thành CANCELLED)
-    public ApiResponse<Void> deleteMeeting(Integer meetingId, String userId, String userRole) {
+    // Hủy cuộc họp (cập nhật trạng thái thành CANCELLED, giữ lại trong database)
+    public ApiResponse<Void> cancelMeeting(Integer meetingId, String userId, String userRole) {
         try {
             Optional<Meeting> meetingOpt = meetingRepository.findById(meetingId);
             if (!meetingOpt.isPresent()) {
@@ -656,18 +656,19 @@ public class MeetingService {
                 return ApiResponse.error("Cuộc họp đã được hủy trước đó");
             }
             
-            // Cập nhật trạng thái thành CANCELLED thay vì xóa
+            // Cập nhật trạng thái thành CANCELLED
             meeting.setBookingStatus(BookingStatus.CANCELLED);
             meetingRepository.save(meeting);
             
             // Xóa event khỏi Google Calendar nếu đã được sync
             if (googleCalendarService != null && meeting.getUser().getGoogleCalendarSyncEnabled() != null 
-                && meeting.getUser().getGoogleCalendarSyncEnabled()) {
+                && meeting.getUser().getGoogleCalendarSyncEnabled() 
+                && meeting.getGoogleEventId() != null && !meeting.getGoogleEventId().isEmpty()) {
                 try {
                     googleCalendarService.deleteMeetingFromGoogleCalendar(meeting.getMeetingId());
+                    System.out.println("Đã xóa event khỏi Google Calendar khi hủy meeting: " + meeting.getGoogleEventId());
                 } catch (Exception e) {
-                    // GoogleCalendarService đã tự động set sync_status = UPDATE_PENDING hoặc DELETED khi lỗi
-                    // Log lỗi nhưng không throw để không block việc hủy meeting
+                    // Log cảnh báo nhưng không block việc hủy meeting
                     System.err.println("Warning: Failed to delete meeting from Google Calendar: " + e.getMessage());
                 }
             } else {
@@ -679,6 +680,44 @@ public class MeetingService {
             return ApiResponse.success(null, "Hủy cuộc họp thành công");
         } catch (Exception e) {
             return ApiResponse.error("Lỗi khi hủy cuộc họp: " + e.getMessage());
+        }
+    }
+    
+    // Xóa cuộc họp hoàn toàn khỏi hệ thống và Google Calendar
+    public ApiResponse<Void> deleteMeeting(Integer meetingId, String userId, String userRole) {
+        try {
+            Optional<Meeting> meetingOpt = meetingRepository.findById(meetingId);
+            if (!meetingOpt.isPresent()) {
+                return ApiResponse.error("Không tìm thấy cuộc họp với ID: " + meetingId);
+            }
+            
+            Meeting meeting = meetingOpt.get();
+            
+            // Kiểm tra quyền: chỉ chủ meeting hoặc admin mới được xóa
+            if (!meeting.getUser().getId().equals(userId) && !userRole.equals("ADMIN")) {
+                return ApiResponse.error("Bạn không có quyền xóa cuộc họp này");
+            }
+            
+            // Xóa event khỏi Google Calendar trước nếu đã được sync
+            if (googleCalendarService != null && meeting.getUser().getGoogleCalendarSyncEnabled() != null 
+                && meeting.getUser().getGoogleCalendarSyncEnabled() 
+                && meeting.getGoogleEventId() != null && !meeting.getGoogleEventId().isEmpty()) {
+                try {
+                    googleCalendarService.deleteMeetingFromGoogleCalendar(meeting.getMeetingId());
+                    System.out.println("Đã xóa event khỏi Google Calendar: " + meeting.getGoogleEventId());
+                } catch (Exception e) {
+                    // Log cảnh báo nhưng vẫn tiếp tục xóa khỏi database
+                    System.err.println("Warning: Failed to delete meeting from Google Calendar: " + e.getMessage());
+                    // Không throw exception để vẫn xóa được khỏi database
+                }
+            }
+            
+            // Xóa hoàn toàn khỏi database
+            meetingRepository.delete(meeting);
+            
+            return ApiResponse.success(null, "Xóa cuộc họp thành công");
+        } catch (Exception e) {
+            return ApiResponse.error("Lỗi khi xóa cuộc họp: " + e.getMessage());
         }
     }
     

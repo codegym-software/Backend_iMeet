@@ -145,9 +145,9 @@ public class MeetingController {
         }
     }
     
-    // Hủy cuộc họp (cập nhật trạng thái thành CANCELLED)
-    @DeleteMapping("/{meetingId}")
-    public ResponseEntity<ApiResponse<Void>> deleteMeeting(
+    // Hủy cuộc họp (cập nhật trạng thái thành CANCELLED, giữ lại trong database)
+    @PatchMapping("/{meetingId}/cancel")
+    public ResponseEntity<ApiResponse<Void>> cancelMeeting(
             @PathVariable Integer meetingId,
             Authentication authentication) {
         try {
@@ -164,13 +164,42 @@ public class MeetingController {
             User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
             
-            // Gọi service với userId để kiểm tra quyền
-            ApiResponse<Void> response = meetingService.deleteMeeting(meetingId, user.getId(), user.getRole().name());
+            // Gọi service để hủy meeting
+            ApiResponse<Void> response = meetingService.cancelMeeting(meetingId, user.getId(), user.getRole().name());
             HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.NOT_FOUND;
             return ResponseEntity.status(status).body(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Lỗi khi hủy cuộc họp: " + e.getMessage()));
+        }
+    }
+    
+    // Xóa cuộc họp hoàn toàn khỏi hệ thống và database
+    @DeleteMapping("/{meetingId}")
+    public ResponseEntity<ApiResponse<Void>> deleteMeeting(
+            @PathVariable Integer meetingId,
+            Authentication authentication) {
+        try {
+            // Kiểm tra authentication
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Vui lòng đăng nhập để xóa cuộc họp"));
+            }
+            
+            // Lấy userId từ authentication (JWT token trả về userId)
+            String userId = authentication.getName();
+            
+            // Tìm user theo userId
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+            
+            // Gọi service để xóa meeting
+            ApiResponse<Void> response = meetingService.deleteMeeting(meetingId, user.getId(), user.getRole().name());
+            HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.NOT_FOUND;
+            return ResponseEntity.status(status).body(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi xóa cuộc họp: " + e.getMessage()));
         }
     }
     
