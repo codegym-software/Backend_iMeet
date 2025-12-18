@@ -1004,4 +1004,43 @@ public class MeetingService {
             return ApiResponse.error("Lỗi khi từ chối lời mời: " + e.getMessage());
         }
     }
+    
+    /**
+     * Cập nhật groupId cho meeting
+     */
+    @Transactional
+    public ApiResponse<MeetingResponse> updateMeetingGroup(Integer meetingId, Long groupId, String userId) {
+        try {
+            // Tìm meeting
+            Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy cuộc họp với ID: " + meetingId));
+            
+            // Kiểm tra quyền: chỉ chủ meeting mới được update group
+            if (!meeting.getUser().getId().equals(userId)) {
+                return ApiResponse.error("Bạn không có quyền cập nhật group cho cuộc họp này");
+            }
+            
+            // Validate group exists
+            Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group không tồn tại với ID: " + groupId));
+            
+            // Kiểm tra user có phải thành viên của group không
+            boolean isMember = groupMemberRepository.existsByGroupAndUser(group, meeting.getUser());
+            if (!isMember) {
+                return ApiResponse.error("Bạn không phải thành viên của group này");
+            }
+            
+            // Update groupId
+            meeting.setGroup(group);
+            Meeting savedMeeting = meetingRepository.save(meeting);
+            
+            System.out.println("✅ Updated meeting " + meetingId + " with groupId: " + groupId);
+            
+            return ApiResponse.success(toMeetingResponse(savedMeeting), 
+                "Cập nhật group cho cuộc họp thành công");
+        } catch (Exception e) {
+            System.err.println("❌ Error updating meeting group: " + e.getMessage());
+            return ApiResponse.error("Lỗi khi cập nhật group: " + e.getMessage());
+        }
+    }
 }

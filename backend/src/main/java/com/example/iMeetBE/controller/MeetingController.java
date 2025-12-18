@@ -387,5 +387,32 @@ public class MeetingController {
                 .body(ApiResponse.error("Lỗi khi tạo file lịch: " + e.getMessage()));
         }
     }
-}
-
+    
+    /**
+     * Cập nhật groupId cho meeting
+     */
+    @PatchMapping("/{meetingId}/group")
+    public ResponseEntity<ApiResponse<MeetingResponse>> updateMeetingGroup(
+            @PathVariable Integer meetingId,
+            @Valid @RequestBody com.example.iMeetBE.dto.UpdateMeetingGroupRequest request,
+            Authentication authentication) {
+        try {
+            if (authentication == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Vui lòng đăng nhập"));
+            }
+            
+            String userId = authentication.getName();
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+            
+            ApiResponse<MeetingResponse> response = meetingService.updateMeetingGroup(
+                meetingId, request.getGroupId(), user.getId());
+            
+            HttpStatus status = response.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
+            return ResponseEntity.status(status).body(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Lỗi khi cập nhật group: " + e.getMessage()));
+        }
+    }}
