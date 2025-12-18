@@ -19,6 +19,8 @@ public class MeetingResponse {
     private String userId;
     private String userName;
     private String userEmail;
+    private Integer meetingGroupId;
+    private String groupName;
     private BookingStatus bookingStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -50,6 +52,12 @@ public class MeetingResponse {
             this.userId = meeting.getUser().getUserId();
             this.userName = meeting.getUser().getFullName();
             this.userEmail = meeting.getUser().getEmail();
+        }
+        
+        // Group info
+        if (meeting.getGroup() != null) {
+            this.meetingGroupId = meeting.getGroup().getGroupId();
+            this.groupName = meeting.getGroup().getName();
         }
         
         this.bookingStatus = meeting.getBookingStatus();
@@ -154,6 +162,22 @@ public class MeetingResponse {
     
     public void setUserEmail(String userEmail) {
         this.userEmail = userEmail;
+    }
+    
+    public Integer getMeetingGroupId() {
+        return meetingGroupId;
+    }
+    
+    public void setMeetingGroupId(Integer meetingGroupId) {
+        this.meetingGroupId = meetingGroupId;
+    }
+    
+    public String getGroupName() {
+        return groupName;
+    }
+    
+    public void setGroupName(String groupName) {
+        this.groupName = groupName;
     }
     
     public BookingStatus getBookingStatus() {
