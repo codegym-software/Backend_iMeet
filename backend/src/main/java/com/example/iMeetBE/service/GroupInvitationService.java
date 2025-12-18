@@ -1,25 +1,41 @@
 package com.example.iMeetBE.service;
 
-import com.example.iMeetBE.dto.GroupInviteResponse;
-import com.example.iMeetBE.dto.InviteToGroupRequest;
-import com.example.iMeetBE.dto.ValidateInviteResponse;
-import com.example.iMeetBE.model.*;
-import com.example.iMeetBE.repository.*;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
+import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+
+import javax.crypto.SecretKey;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.crypto.SecretKey;
-import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.example.iMeetBE.dto.GroupInviteResponse;
+import com.example.iMeetBE.dto.InviteToGroupRequest;
+import com.example.iMeetBE.dto.ValidateInviteResponse;
+import com.example.iMeetBE.model.Group;
+import com.example.iMeetBE.model.GroupInvite;
+import com.example.iMeetBE.model.GroupMember;
+import com.example.iMeetBE.model.GroupRole;
+import com.example.iMeetBE.model.InviteRole;
+import com.example.iMeetBE.model.InviteStatus;
+import com.example.iMeetBE.model.InviteStatusGroup;
+import com.example.iMeetBE.model.Meeting;
+import com.example.iMeetBE.model.MeetingInvitee;
+import com.example.iMeetBE.model.User;
+import com.example.iMeetBE.repository.GroupInviteRepository;
+import com.example.iMeetBE.repository.GroupMemberRepository;
+import com.example.iMeetBE.repository.GroupRepository;
+import com.example.iMeetBE.repository.MeetingInviteeRepository;
+import com.example.iMeetBE.repository.MeetingRepository;
+import com.example.iMeetBE.repository.UserRepository;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 
 @Service
 public class GroupInvitationService {
