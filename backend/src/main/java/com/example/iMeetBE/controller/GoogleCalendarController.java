@@ -220,11 +220,17 @@ public class GoogleCalendarController {
                 && user.getGoogleRefreshToken() != null 
                 && !user.getGoogleRefreshToken().isEmpty();
 
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "connected", isConnected,
-                "calendarSyncEnabled", user.getGoogleCalendarSyncEnabled() != null ? user.getGoogleCalendarSyncEnabled() : false
-            ));
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("connected", isConnected);
+            response.put("calendarSyncEnabled", user.getGoogleCalendarSyncEnabled() != null ? user.getGoogleCalendarSyncEnabled() : false);
+            
+            // Thêm Google email nếu đã kết nối
+            if (isConnected && user.getGoogleEmail() != null) {
+                response.put("googleEmail", user.getGoogleEmail());
+            }
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("success", false, "error", "Lỗi khi kiểm tra trạng thái: " + e.getMessage()));
