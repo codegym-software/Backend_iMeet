@@ -46,6 +46,8 @@ import com.google.api.services.calendar.model.Channel;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.Events;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -145,6 +147,26 @@ public class GoogleCalendarService {
             user.setGoogleTokenExpiry(LocalDateTime.now().plusSeconds(expiresIn));
             user.setGoogleCalendarSyncEnabled(true);
             user.setUpdatedAt(LocalDateTime.now());
+
+            // Lấy thông tin email từ Google bằng tokeninfo endpoint
+            try {
+                String tokenInfoUrl = "https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=" 
+                    + tokenResponse.getAccessToken();
+                String response = HTTP_TRANSPORT.createRequestFactory()
+                    .buildGetRequest(new GenericUrl(tokenInfoUrl))
+                    .execute()
+                    .parseAsString();
+                
+                Gson gson = new Gson();
+                JsonObject jsonObject = gson.fromJson(response, JsonObject.class);
+                if (jsonObject.has("email")) {
+                    String email = jsonObject.get("email").getAsString();
+                    user.setGoogleEmail(email);
+                    logger.info("Saved Google email for user {}: {}", user.getId(), email);
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to get Google email for user {}: {}", user.getId(), e.getMessage());
+            }
 
             userRepository.save(user);
 
@@ -498,6 +520,7 @@ public class GoogleCalendarService {
         // Xóa tokens và tắt sync
         user.setGoogleCalendarSyncEnabled(false);
         user.setGoogleRefreshToken(null);
+        user.setGoogleEmail(null);
         user.setAccessToken(null);
         user.setGoogleTokenExpiry(null);
         user.setGoogleChannelId(null);

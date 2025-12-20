@@ -42,6 +42,9 @@ public class User {
     @Column(name = "google_refresh_token", columnDefinition = "TEXT")
     private String googleRefreshToken;
 
+    @Column(name = "google_email", length = 255)
+    private String googleEmail;
+
     @Column(name = "google_calendar_sync_enabled")
     private Boolean googleCalendarSyncEnabled = false;
 
@@ -160,6 +163,14 @@ public class User {
 
     public void setGoogleRefreshToken(String googleRefreshToken) {
         this.googleRefreshToken = googleRefreshToken;
+    }
+
+    public String getGoogleEmail() {
+        return googleEmail;
+    }
+
+    public void setGoogleEmail(String googleEmail) {
+        this.googleEmail = googleEmail;
     }
 
     public Boolean getGoogleCalendarSyncEnabled() {
