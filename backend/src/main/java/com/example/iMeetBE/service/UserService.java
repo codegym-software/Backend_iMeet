@@ -36,15 +36,38 @@ public class UserService {
 
     public void updateUserProfile(String username, UpdateProfileRequest request) {
         try {
-            // 1. Cập nhật database trước
-            User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new RuntimeException("User not found in database: " + username));
+            // 1. Tìm user trong database - thử nhiều cách
+            User user = null;
+            
+            // Thử tìm bằng email trước
+            if (username != null && username.contains("@")) {
+                user = userRepository.findByEmail(username).orElse(null);
+            }
+            
+            // Nếu không tìm thấy, thử tìm bằng username
+            if (user == null) {
+                user = userRepository.findByUsername(username).orElse(null);
+            }
+            
+            // Nếu vẫn không tìm thấy, thử tìm bằng ID
+            if (user == null) {
+                user = userRepository.findById(username).orElse(null);
+            }
+            
+            if (user == null) {
+                throw new RuntimeException("User not found in database: " + username);
+            }
+            
+            // Lấy email thực tế của user để dùng cho Cognito
+            String userEmail = user.getEmail();
+            String cognitoUsername = userEmail; // Dùng email làm username cho Cognito
             
             boolean updated = false;
             
             if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
                 user.setEmail(request.getEmail());
                 updated = true;
+                cognitoUsername = request.getEmail(); // Cập nhật Cognito username nếu email thay đổi
             }
 
             if (request.getName() != null && !request.getName().trim().isEmpty()) {
@@ -56,35 +79,40 @@ public class UserService {
                 userRepository.save(user);
             }
 
-            // 2. Cập nhật Cognito (nếu cần)
-            List<AttributeType> attributes = new ArrayList<>();
+            // 2. Cập nhật Cognito (nếu cần và không phải OAuth user)
+            // Chỉ cập nhật Cognito nếu user không phải OAuth user (không có googleId)
+            if (user.getGoogleId() == null || user.getGoogleId().isEmpty()) {
+                List<AttributeType> attributes = new ArrayList<>();
 
-            if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-                attributes.add(new AttributeType()
-                    .withName("email")
-                    .withValue(request.getEmail()));
-            }
+                if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+                    attributes.add(new AttributeType()
+                        .withName("email")
+                        .withValue(request.getEmail()));
+                }
 
-            if (request.getName() != null && !request.getName().trim().isEmpty()) {
-                attributes.add(new AttributeType()
-                    .withName("name")
-                    .withValue(request.getName()));
-            }
+                if (request.getName() != null && !request.getName().trim().isEmpty()) {
+                    attributes.add(new AttributeType()
+                        .withName("name")
+                        .withValue(request.getName()));
+                }
 
-            if (!attributes.isEmpty()) {
-                AdminUpdateUserAttributesRequest updateRequest = new AdminUpdateUserAttributesRequest()
-                    .withUserPoolId(userPoolId)
-                    .withUsername(username)
-                    .withUserAttributes(attributes);
+                if (!attributes.isEmpty()) {
+                    AdminUpdateUserAttributesRequest updateRequest = new AdminUpdateUserAttributesRequest()
+                        .withUserPoolId(userPoolId)
+                        .withUsername(cognitoUsername)
+                        .withUserAttributes(attributes);
 
-                cognitoClient.adminUpdateUserAttributes(updateRequest);
+                    cognitoClient.adminUpdateUserAttributes(updateRequest);
+                }
             }
 
         } catch (AWSCognitoIdentityProviderException e) {
             System.err.println("❌ Error updating user profile in Cognito: " + e.getMessage());
-            throw new RuntimeException("Failed to update user profile: " + e.getMessage());
+            // Không throw exception nếu chỉ lỗi Cognito - vì database đã được cập nhật
+            System.err.println("⚠️ Warning: Database updated but Cognito update failed. User: " + username);
         } catch (Exception e) {
             System.err.println("❌ Error updating user profile: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("Failed to update user profile: " + e.getMessage());
         }
     }
