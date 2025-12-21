@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -208,6 +207,7 @@ public class AuthController {
             System.out.println("🔵 Authentication: " + (authentication != null ? authentication.getName() : "null"));
             System.out.println("🔵 Is Authenticated: " + (authentication != null && authentication.isAuthenticated()));
             System.out.println("🔵 Auth Header: " + (authHeader != null ? authHeader.substring(0, Math.min(20, authHeader.length())) + "..." : "null"));
+            System.out.println("🔵 File: " + (file != null ? file.getOriginalFilename() + " (" + file.getSize() + " bytes)" : "null"));
             
             // Kiểm tra authentication
             if (authentication == null || !authentication.isAuthenticated()) {
@@ -217,20 +217,26 @@ public class AuthController {
 
             // Validate file
             if (file == null || file.isEmpty()) {
+                System.err.println("❌ [UPLOAD-AVATAR] File is null or empty");
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Vui lòng chọn file ảnh"));
             }
 
             String contentType = file.getContentType();
+            System.out.println("🔵 File Content-Type: " + contentType);
+            
             if (contentType == null || !contentType.startsWith("image/")) {
+                System.err.println("❌ [UPLOAD-AVATAR] Invalid file type: " + contentType);
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "File phải là ảnh"));
             }
 
             if (file.getSize() > 5 * 1024 * 1024) { // 5MB
+                System.err.println("❌ [UPLOAD-AVATAR] File too large: " + file.getSize() + " bytes");
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Kích thước file không được vượt quá 5MB"));
             }
 
             // Lấy user từ authentication - có thể là email, username hoặc ID
             String identifier = authentication.getName();
+            System.out.println("🔵 User identifier from auth: " + identifier);
             
             // Tìm user trong database - thử nhiều cách
             User user = null;
@@ -238,16 +244,19 @@ public class AuthController {
             // Thử tìm bằng email trước (nếu có ký tự @)
             if (identifier != null && identifier.contains("@")) {
                 user = userRepository.findByEmail(identifier).orElse(null);
+                System.out.println("🔵 Tried findByEmail: " + (user != null ? "found" : "not found"));
             }
             
             // Nếu không tìm thấy, thử tìm bằng username
             if (user == null) {
                 user = userRepository.findByUsername(identifier).orElse(null);
+                System.out.println("🔵 Tried findByUsername: " + (user != null ? "found" : "not found"));
             }
             
             // Nếu vẫn không tìm thấy, thử tìm bằng ID
             if (user == null) {
                 user = userRepository.findById(identifier).orElse(null);
+                System.out.println("🔵 Tried findById: " + (user != null ? "found" : "not found"));
             }
             
             if (user == null) {
@@ -258,8 +267,12 @@ public class AuthController {
                 ));
             }
 
+            System.out.println("✅ [UPLOAD-AVATAR] User found: " + user.getEmail());
+
             // Upload avatar
             String avatarUrl = authService.uploadAvatar(user, file);
+            
+            System.out.println("✅ [UPLOAD-AVATAR] Avatar uploaded successfully");
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -267,8 +280,10 @@ public class AuthController {
                 "avatarUrl", avatarUrl
             ));
         } catch (IOException e) {
+            System.err.println("❌ [UPLOAD-AVATAR] IOException: " + e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Lỗi upload file: " + e.getMessage()));
         } catch (Exception e) {
+            System.err.println("❌ [UPLOAD-AVATAR] Exception: " + e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         }
     }
@@ -284,10 +299,22 @@ public class AuthController {
             }
 
             // Lấy user từ authentication
-            String email = authentication.getName();
+            String identifier = authentication.getName();
             
-            // Kiểm tra xem user có trong database không
-            User user = userRepository.findByEmail(email).orElse(null);
+            // Tìm user trong database - thử nhiều cách
+            User user = null;
+            
+            if (identifier != null && identifier.contains("@")) {
+                user = userRepository.findByEmail(identifier).orElse(null);
+            }
+            
+            if (user == null) {
+                user = userRepository.findByUsername(identifier).orElse(null);
+            }
+            
+            if (user == null) {
+                user = userRepository.findById(identifier).orElse(null);
+            }
             
             if (user == null) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -314,6 +341,4 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         }
     }
-
-
 }
