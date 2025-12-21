@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -17,8 +18,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.validation.Valid;
-
 import com.example.iMeetBE.dto.ChangePasswordRequest;
 import com.example.iMeetBE.dto.ChangePasswordResponse;
 import com.example.iMeetBE.dto.LoginRequest;
@@ -28,6 +27,8 @@ import com.example.iMeetBE.dto.SignupResponse;
 import com.example.iMeetBE.model.User;
 import com.example.iMeetBE.repository.UserRepository;
 import com.example.iMeetBE.service.AuthService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -197,7 +198,7 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/upload-avatar")
+    @PostMapping(value = "/upload-avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadAvatar(
             @RequestParam("avatar") MultipartFile file,
             Authentication authentication,
@@ -228,13 +229,29 @@ public class AuthController {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Kích thước file không được vượt quá 5MB"));
             }
 
-            // Lấy user từ authentication
-            String email = authentication.getName();
+            // Lấy user từ authentication - có thể là email, username hoặc ID
+            String identifier = authentication.getName();
             
-            // Kiểm tra xem user có trong database không
-            User user = userRepository.findByEmail(email).orElse(null);
+            // Tìm user trong database - thử nhiều cách
+            User user = null;
+            
+            // Thử tìm bằng email trước (nếu có ký tự @)
+            if (identifier != null && identifier.contains("@")) {
+                user = userRepository.findByEmail(identifier).orElse(null);
+            }
+            
+            // Nếu không tìm thấy, thử tìm bằng username
+            if (user == null) {
+                user = userRepository.findByUsername(identifier).orElse(null);
+            }
+            
+            // Nếu vẫn không tìm thấy, thử tìm bằng ID
+            if (user == null) {
+                user = userRepository.findById(identifier).orElse(null);
+            }
             
             if (user == null) {
+                System.err.println("❌ [UPLOAD-AVATAR] User not found with identifier: " + identifier);
                 return ResponseEntity.badRequest().body(Map.of(
                     "success", false, 
                     "message", "Không tìm thấy thông tin người dùng"
