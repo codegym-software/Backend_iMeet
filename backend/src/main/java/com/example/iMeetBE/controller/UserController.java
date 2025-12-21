@@ -116,12 +116,12 @@ public class UserController {
                 ));
             }
 
-            // Kiểm tra loại tài khoản - chỉ cho phép tài khoản đăng ký qua web
-            // Với traditional users, username sẽ là email
-            if (username.startsWith("google_")) {
-                System.err.println("❌ Google OAuth2 users cannot update profile");
+            // Kiểm tra loại tài khoản - OAuth2 users không thể đổi email
+            boolean isOAuthUser = username.startsWith("google_");
+            if (isOAuthUser && request.getEmail() != null) {
+                System.err.println("❌ Google OAuth2 users cannot change email");
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new UpdateProfileResponse(
-                    false, "Google OAuth2 users cannot update profile. Please update your information in Google Account."
+                    false, "Google OAuth2 users cannot change email. Please update your email in Google Account."
                 ));
             }
 
