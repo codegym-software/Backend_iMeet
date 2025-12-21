@@ -203,8 +203,14 @@ public class AuthController {
             Authentication authentication,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
+            System.out.println("🔵 [UPLOAD-AVATAR] Request received");
+            System.out.println("🔵 Authentication: " + (authentication != null ? authentication.getName() : "null"));
+            System.out.println("🔵 Is Authenticated: " + (authentication != null && authentication.isAuthenticated()));
+            System.out.println("🔵 Auth Header: " + (authHeader != null ? authHeader.substring(0, Math.min(20, authHeader.length())) + "..." : "null"));
+            
             // Kiểm tra authentication
             if (authentication == null || !authentication.isAuthenticated()) {
+                System.err.println("❌ [UPLOAD-AVATAR] Authentication failed");
                 return ResponseEntity.status(401).body(Map.of("success", false, "message", "Vui lòng đăng nhập"));
             }
 
