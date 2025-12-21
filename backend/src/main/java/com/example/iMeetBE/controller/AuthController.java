@@ -18,8 +18,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.validation.Valid;
-
 import com.example.iMeetBE.dto.ChangePasswordRequest;
 import com.example.iMeetBE.dto.ChangePasswordResponse;
 import com.example.iMeetBE.dto.LoginRequest;
@@ -29,6 +27,8 @@ import com.example.iMeetBE.dto.SignupResponse;
 import com.example.iMeetBE.model.User;
 import com.example.iMeetBE.repository.UserRepository;
 import com.example.iMeetBE.service.AuthService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/auth")
