@@ -156,24 +156,19 @@ public class GoogleCalendarController {
             message += "<br><br>Đang quay về trang chủ...";
         }
         
-        String redirectScript = success 
-            ? "try { " +
-              "localStorage.setItem('calendar_just_connected', 'true'); " +
-              "localStorage.removeItem('calendar_connecting'); " +
-              "console.log('Calendar connected successfully, redirecting to profile...'); " +
-              "setTimeout(() => { " +
-              "  const currentPath = window.location.pathname; " +
-              "  if (currentPath.includes('callback')) { " +
-              "    window.location.replace('https://imeett.site/profile'); " +
-              "  } " +
-              "}, 1500); " +
-              "} catch(e) { console.error('Redirect error:', e); }"
-            : "try { " +
-              "localStorage.setItem('calendar_connection_error', '" + error + "'); " +
-              "localStorage.removeItem('calendar_connecting'); " +
-              "console.log('Calendar connection failed, redirecting to home...'); " +
-              "setTimeout(() => { window.location.replace('https://imeett.site/trang-chu'); }, 2000); " +
-              "} catch(e) { console.error('Redirect error:', e); }";
+        // Redirect về frontend callback route với query params để frontend xử lý
+        String frontendUrl = "https://imeett.site";
+        String redirectUrl = success 
+            ? frontendUrl + "/google-calendar-callback?success=true"
+            : frontendUrl + "/google-calendar-callback?success=false&error=" + error;
+        
+        String redirectScript = 
+            "try { " +
+            "  console.log('Redirecting to: " + redirectUrl + "'); " +
+            "  setTimeout(() => { " +
+            "    window.location.replace('" + redirectUrl + "'); " +
+            "  }, 1500); " +
+            "} catch(e) { console.error('Redirect error:', e); }";
         
         return "<!DOCTYPE html>" +
             "<html><head><meta charset='UTF-8'>" +
