@@ -736,8 +736,14 @@ public class CognitoService {
                 if (fullName != null && !fullName.isEmpty()) {
                     user.setFullName(fullName);
                 }
+                // Chỉ set avatar từ Google nếu user chưa có avatar custom (không phải base64)
                 if (pictureUrl != null && !pictureUrl.isEmpty()) {
-                    user.setAvatarUrl(pictureUrl);
+                    String currentAvatar = user.getAvatarUrl();
+                    // Chỉ update nếu chưa có avatar hoặc avatar hiện tại vẫn là Google avatar
+                    if (currentAvatar == null || currentAvatar.isEmpty() || 
+                        (!currentAvatar.startsWith("data:image") && currentAvatar.startsWith("http"))) {
+                        user.setAvatarUrl(pictureUrl);
+                    }
                 }
                 if (username != null && !username.isEmpty()) {
                     user.setUsername(username);
