@@ -230,18 +230,9 @@ public class AuthController {
             User user = userRepository.findByEmail(email).orElse(null);
             
             if (user == null) {
-                // OAuth2 user - không cho phép upload avatar
                 return ResponseEntity.badRequest().body(Map.of(
                     "success", false, 
-                    "message", "Tài khoản Google không thể đổi avatar tại đây"
-                ));
-            }
-            
-            // Kiểm tra xem user có phải là traditional user không (có password hash)
-            if (user.getPasswordHash() == null || user.getPasswordHash().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "success", false, 
-                    "message", "Chỉ tài khoản đăng ký tại website mới có thể đổi avatar"
+                    "message", "Không tìm thấy thông tin người dùng"
                 ));
             }
 
@@ -277,18 +268,9 @@ public class AuthController {
             User user = userRepository.findByEmail(email).orElse(null);
             
             if (user == null) {
-                // OAuth2 user - không cho phép xóa avatar
                 return ResponseEntity.badRequest().body(Map.of(
                     "success", false, 
-                    "message", "Tài khoản Google không thể xóa avatar tại đây"
-                ));
-            }
-            
-            // Kiểm tra xem user có phải là traditional user không (có password hash)
-            if (user.getPasswordHash() == null || user.getPasswordHash().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "success", false, 
-                    "message", "Chỉ tài khoản đăng ký tại website mới có thể xóa avatar"
+                    "message", "Không tìm thấy thông tin người dùng"
                 ));
             }
 
