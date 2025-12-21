@@ -76,6 +76,8 @@ public class AuthService {
         user.setAccessToken(token);
         userRepository.save(user);
         
+        // Debug: Log avatar URL
+        System.out.println("🔵 [LOGIN] User: " + user.getEmail() + " | Avatar URL: " + (user.getAvatarUrl() != null ? user.getAvatarUrl().substring(0, Math.min(50, user.getAvatarUrl().length())) + "..." : "null"));
 
         return new LoginResponse(true, "Đăng nhập thành công", token, user.getId(), user.getUsername(), user.getFullName(), user.getEmail(), user.getAvatarUrl(), user.getRole().name());
     }
@@ -197,6 +199,8 @@ public class AuthService {
             // Cập nhật user với base64 data URL
             user.setAvatarUrl(base64Data);
             userRepository.save(user);
+            
+            System.out.println("✅ [UPLOAD-AVATAR] User: " + user.getEmail() + " | Avatar saved successfully | Size: " + base64Data.length() + " chars");
             
             return base64Data;
         } catch (IOException e) {
